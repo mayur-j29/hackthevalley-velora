@@ -50,11 +50,15 @@ test('state round trips and local persistence survives reload', () => {
   const storage = { getItem: key => values.get(key) || null, setItem: (key, value) => values.set(key, value) };
   const simulation = createSimulation({ seed: 42, currentDate: '2026-10-17' });
   simulation.placeOrder('marcus', 'SPY', 2, 'buy');
+  simulation.setTradingMode('marcus', 'auto');
+  const proposal = simulation.addDecision('marcus', { actionType: 'buy', ticker: 'BND', amountUsd: 100, reason: 'Diversify the simulated portfolio.', status: 'pending' });
   simulation.advanceTime(1);
   assert.equal(saveSimulation(simulation, storage), true);
   const restored = loadSimulation(storage);
   assert.deepEqual(restored.getPrices(), simulation.getPrices());
   assert.deepEqual(restored.getPortfolio('marcus'), simulation.getPortfolio('marcus'));
+  assert.equal(restored.getActivity('marcus').mode, 'auto');
+  assert.deepEqual(restored.getActivity('marcus').pendingApprovals, [proposal.id]);
   const fresh = simulation.reset({ currentDate: '2026-10-17' });
   assert.equal(fresh.getPortfolio('marcus').netWorth, 25000);
 });

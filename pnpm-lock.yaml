@@ -23,6 +23,9 @@ importers:
       vite:
         specifier: latest
         version: 8.3.4
+      zod:
+        specifier: ^4.6.7
+        version: 4.6.7
 
 packages:
 
@@ -325,6 +328,9 @@ packages:
       yaml:
         optional: true
 
+  zod@4.6.7:
+    resolution: {integrity: sha512-g8W2D2kU6a8untc053fX1uVBKzM7yqAxW/3zwk83+6RyF2+SKOuV+c0wBDhUwzV1PaGapmZH+rmcUzPf+3CGwg==}
+
 snapshots:
 
   '@oxc-project/types@0.154.0': {}
@@ -501,3 +507,5 @@ snapshots:
       tinyglobby: 0.2.17
     optionalDependencies:
       fsevents: 2.3.3
+
+  zod@4.6.7: {}

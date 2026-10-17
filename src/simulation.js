@@ -71,6 +71,9 @@ function createAccount(persona, date) {
     cash: persona.startingCash,
     positions: {},
     orders: [],
+    decisions: [],
+    pendingApprovals: [],
+    tradingMode: 'approve',
     history: [{ date: isoDate(date), value: persona.startingCash }],
   };
 }
@@ -199,6 +202,32 @@ export function createSimulation(options = {}) {
     return { portfolio: clone(account.history), market: Object.fromEntries(Object.entries(marketHistory).map(([ticker, rows]) => [ticker, clone(rows)])) };
   }
 
+  function getActivity(accountRef) {
+    const account = resolveAccount(accountRef);
+    return { mode: account.tradingMode === 'auto' ? 'auto' : 'approve', decisions: clone(account.decisions || []), pendingApprovals: clone(account.pendingApprovals || []) };
+  }
+
+  function setTradingMode(accountRef, mode) {
+    if (!['approve', 'auto'].includes(mode)) throw new Error('Unknown trading mode.');
+    resolveAccount(accountRef).tradingMode = mode;
+    return getActivity(accountRef);
+  }
+
+  function addDecision(accountRef, decision) {
+    const account = resolveAccount(accountRef);
+    const item = { ...clone(decision), id: decision.id || `${account.id}-decision-${Date.now()}-${account.decisions.length}`, createdAt: decision.createdAt || new Date().toISOString() };
+    account.decisions = [item, ...(account.decisions || [])].slice(0, 100);
+    if (item.status === 'pending') account.pendingApprovals = [item.id, ...(account.pendingApprovals || [])].slice(0, 30);
+    return clone(item);
+  }
+
+  function updateDecision(accountRef, id, patch) {
+    const account = resolveAccount(accountRef);
+    account.decisions = (account.decisions || []).map(item => item.id === id ? { ...item, ...clone(patch) } : item);
+    if (patch.status && patch.status !== 'pending') account.pendingApprovals = (account.pendingApprovals || []).filter(itemId => itemId !== id);
+    return getActivity(accountRef);
+  }
+
   function setRegime(next) {
     if (!REGIMES[next]) throw new Error('Unknown market regime.');
     regime = next;
@@ -242,6 +271,11 @@ export function createSimulation(options = {}) {
     prices = { ...saved.prices };
     marketHistory = clone(saved.marketHistory);
     accounts = clone(saved.accounts);
+    for (const account of Object.values(accounts)) {
+      account.decisions = Array.isArray(account.decisions) ? account.decisions : [];
+      account.pendingApprovals = Array.isArray(account.pendingApprovals) ? account.pendingApprovals : [];
+      account.tradingMode = account.tradingMode === 'auto' ? 'auto' : 'approve';
+    }
     events = Array.isArray(saved.events) ? clone(saved.events).slice(-120) : [];
   }
 
@@ -249,7 +283,7 @@ export function createSimulation(options = {}) {
     return createSimulation({ seed: resetOptions.seed ?? options.seed ?? 74219, currentDate: resetOptions.currentDate ?? options.currentDate, regime: resetOptions.regime ?? 'sideways' });
   }
 
-  return { advanceTime, getPrices, getPortfolio, getHistory, placeOrder, setRegime, setDemoCrash, exportState, importState, reset, getEvents: () => clone(events), getDate: () => isoDate(date), getAccounts: () => Object.values(accounts).map(account => ({ ...account.profile })) };
+  return { advanceTime, getPrices, getPortfolio, getHistory, getActivity, setTradingMode, addDecision, updateDecision, placeOrder, setRegime, setDemoCrash, exportState, importState, reset, getEvents: () => clone(events), getDate: () => isoDate(date), getAccounts: () => Object.values(accounts).map(account => ({ ...account.profile })) };
 }
 
 export function loadSimulation(storage = globalThis.localStorage) {

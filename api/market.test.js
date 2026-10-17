@@ -36,7 +36,7 @@ test('market history defaults to and labels the S&P 500 ETF proxy explicitly', a
   const originalFetch = globalThis.fetch;
   const timestamps = [1_700_000_000, 1_700_086_400];
   globalThis.fetch = async () => Response.json({
-    chart: { result: [{ timestamp: timestamps, meta: { currency: 'USD' }, indicators: { adjclose: [{ adjclose: [100, 102] }] } }] },
+    chart: { result: [{ timestamp: timestamps, meta: { currency: 'USD' }, indicators: { adjclose: [{ adjclose: [100, 102] }], quote: [{ close: [100, 102] }] } }] },
   });
   try {
     await handler({ method: 'GET', url: '/' }, response);
