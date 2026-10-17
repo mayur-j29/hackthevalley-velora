@@ -13,7 +13,7 @@ function localApiRoutes() {
     name: 'velora-local-api-routes',
     configResolved(config) {
       const localSecrets = loadEnv(config.mode, config.root, '');
-      for (const name of ['GEMINI_API_KEY', 'GEMINI_MODEL', 'TWELVE_DATA_API_KEY', 'PLAID_CLIENT_ID', 'PLAID_SECRET']) {
+      for (const name of ['GEMINI_API_KEY', 'GEMINI_MODEL', 'SUPABASE_URL', 'SUPABASE_ANON_KEY', 'TWELVE_DATA_API_KEY', 'PLAID_CLIENT_ID', 'PLAID_SECRET']) {
         if (localSecrets[name]) process.env[name] = localSecrets[name];
       }
     },

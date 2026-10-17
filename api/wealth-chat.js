@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { requireSignedInUser } from './_auth.js';
 import { ASSETS, PERSONAS } from '../src/simulation.ts';
 
 const MAX_QUESTION_LENGTH = 280;
@@ -9,6 +10,7 @@ const cache = new Map();
 
 export default async function handler(request, response) {
   if (request.method !== 'POST') return response.status(405).json({ error: 'Method not allowed.' });
+  if (!await requireSignedInUser(request, response)) return;
   const body = request.body && typeof request.body === 'object' ? request.body : {};
   const question = typeof body.question === 'string' ? body.question.trim().slice(0, MAX_QUESTION_LENGTH) : '';
   if (!question) return response.status(400).json({ error: 'Add a question first.' });
@@ -59,12 +61,17 @@ export default async function handler(request, response) {
 function normalizeContext(body) {
   const persona = PERSONAS.find(person => person.id === body.accountId);
   if (!persona || !body.portfolio || typeof body.portfolio !== 'object') return null;
+  const risk = ['aggressive', 'balanced', 'conservative'].includes(body.profile?.risk) ? body.profile.risk : persona.risk;
+  const name = typeof body.profile?.name === 'string' ? body.profile.name.trim().slice(0, 48) : '';
+  const goal = typeof body.profile?.goal === 'string' ? body.profile.goal.trim().slice(0, 120) : '';
+  const age = Number.isInteger(Number(body.profile?.age)) ? bounded(body.profile.age, 13, 100) : persona.age;
+  const horizonYears = Number.isInteger(Number(body.profile?.horizonYears)) ? bounded(body.profile.horizonYears, 1, 60) : persona.horizonYears;
   const holdings = Array.isArray(body.portfolio.holdings) ? body.portfolio.holdings.filter(item => ASSETS[item?.ticker]).slice(0, 10).map(item => ({ ticker: item.ticker, quantity: bounded(item.quantity, 0, 1_000_000), marketValue: bounded(item.marketValue, 0, 2_000_000), unrealizedPnl: bounded(item.unrealizedPnl, -2_000_000, 2_000_000) })) : [];
   const netWorth = bounded(body.portfolio.netWorth, 0, 2_000_000);
   if (netWorth <= 0) return null;
   const decisions = Array.isArray(body.decisions) ? body.decisions.slice(0, 30).map(item => ({ type: String(item.actionType || '').slice(0, 20), ticker: String(item.ticker || '').slice(0, 12), amountUsd: bounded(item.amountUsd, 0, 2_000_000), reason: String(item.reason || '').slice(0, 180), status: ['executed', 'pending', 'blocked', 'rejected'].includes(item.status) ? item.status : 'pending', simDate: String(item.simDate || '').slice(0, 10) })) : [];
   const events = Array.isArray(body.events) ? body.events.slice(-8).map(item => ({ headline: String(item.headline || '').slice(0, 140), date: String(item.date || '').slice(0, 10), tickers: Array.isArray(item.tickers) ? item.tickers.filter(ticker => ASSETS[ticker]).slice(0, 10) : [] })) : [];
-  return { profile: { name: persona.name, age: persona.age, goal: persona.goal, risk: persona.risk, horizonYears: persona.horizonYears }, asOf: String(body.asOf || '').slice(0, 10), portfolio: { cash: bounded(body.portfolio.cash, 0, 2_000_000), netWorth, holdings }, events, decisions };
+  return { profile: { name: name || persona.name, age, occupation: String(body.profile?.occupation || persona.occupation).slice(0, 48), goal: goal || persona.goal, risk, horizonYears }, asOf: String(body.asOf || '').slice(0, 10), portfolio: { cash: bounded(body.portfolio.cash, 0, 2_000_000), netWorth, holdings }, events, decisions };
 }
 
 function fallbackAnswer(question, context) {

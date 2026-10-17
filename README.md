@@ -1,12 +1,12 @@
 # Velora
 
-Velora’s primary **Wealth Manager** workspace runs a seeded, local-only market simulation with three dummy portfolios. Its prices are generated in the browser; no broker or market-data API is used by this workspace. Portfolio state and decisions persist in browser storage. Gemini is optional and runs only from server-side Vercel functions; without a key or when AI is unavailable, Velora uses deterministic persona-based rules.
+Velora’s primary **Wealth Manager** workspace runs a seeded market simulation with three dummy portfolios. Its prices are generated in the browser; no broker or market-data API is used by this workspace. When Supabase is configured, users sign in, enter a short profile, and save simulation state in a private per-user database row. Without Supabase, it stays in clearly labeled local mode. Gemini is optional and runs only from server-side Vercel functions; without a key or when AI is unavailable, Velora uses deterministic persona-based rules.
 
 The existing educational planning, paper-trading, market replay, and Plaid Sandbox pages remain available from the sidebar. Those older pages retain their existing data providers and Sandbox-only bank flow; no page can connect to a brokerage or place a real securities order.
 
 ## Simulated Wealth Manager
 
-- Aisha, Marcus, and Elena have seeded cash balances, goals, risk profiles, and horizons. The AI fallback uses visibly different target mixes for aggressive, balanced, and conservative profiles.
+- Aisha, Marcus, and Elena have seeded cash balances, goals, risk profiles, and horizons. New users enter a name, age, occupation, risk comfort, goal, and horizon; Velora greets them by name and selects a starting simulated portfolio based on their risk choice. The AI fallback uses visibly different target mixes for aggressive, balanced, and conservative profiles.
 - The simulated market includes ten stocks and ETFs, seeded geometric price paths, four switchable regimes, market events, simulated fees/slippage, and two years of chart history.
 - The Approve mode queues AI proposals for review. Auto mode applies the same deterministic limits: a 25% per-stock cap, persona cash buffers, three trades per cycle, no shorting or leverage, and a daily drawdown circuit breaker.
 - Fast-forward runs weekly AI cycles. Demo crash setup seeds a persona-based paper portfolio, applies a crash, and asks Velora to review risk. The SPY and cash comparisons use the same seeded history.
@@ -33,7 +33,16 @@ The Vite development server mounts local adapters for the legacy market tools, G
 
 ## Deploy the simulation
 
-Import the GitHub repository into Vercel using the Vite preset. Use `npm run build` as the build command and `dist` as the output directory; Vercel deploys the functions in `api/` alongside the frontend. Add `GEMINI_API_KEY` in Vercel Project Settings → Environment Variables to enable LLM responses; without it, the wealth agent and chat advisor use their local rule fallbacks. `TWELVE_DATA_API_KEY` is optional for the existing market and trading pages. These keys are read server-side only; never use `VITE_`-prefixed secrets. Add the **Sandbox-only** `PLAID_CLIENT_ID` / `PLAID_SECRET` only if the legacy Plaid Sandbox page is wanted. There is no user authentication or shared server-side account database: simulated account state and other editable practice data are stored in each browser's local storage.
+Import the GitHub repository into Vercel using the Vite preset. Use `npm run build` as the build command and `dist` as the output directory; Vercel deploys the functions in `api/` alongside the frontend. Add `GEMINI_API_KEY` in Vercel Project Settings → Environment Variables to enable LLM responses; without it, the wealth agent and chat advisor use their local rule fallbacks. `TWELVE_DATA_API_KEY` is optional for the existing market and trading pages. These keys are read server-side only; never use `VITE_`-prefixed secrets. Add the **Sandbox-only** `PLAID_CLIENT_ID` / `PLAID_SECRET` only if the legacy Plaid Sandbox page is wanted. The Wealth Manager can use Supabase email/password authentication and private cloud saves; the older planning and paper-trading pages still use this browser's local storage.
+
+### Enable account sign-in and cloud saves
+
+1. Create a Supabase project and run [`supabase/schema.sql`](supabase/schema.sql) in its SQL Editor.
+2. In Supabase Authentication, enable email/password sign-in and set the Site URL and allowed redirect URLs to your Vercel domain (and `http://localhost:5173` for local development).
+3. Copy the project URL and public anon/publishable key from the Supabase API settings. Add the same values to Vercel as `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `SUPABASE_URL`, and `SUPABASE_ANON_KEY` for Production and Preview. Use only the anon/publishable key; never expose or use `service_role` in this app.
+4. Redeploy. The Wealth Manager asks each user to sign in or create an account, collects their profile, and saves simulated accounts and decision history in a row protected by Supabase Row Level Security.
+
+For local development, put those four Supabase values in the untracked `.env.local`. Run the SQL schema once per Supabase project. If email confirmation is enabled, users confirm their address before signing in.
 
 ## Optional Gemini Copilot
 

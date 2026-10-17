@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { requireSignedInUser } from './_auth.js';
 import { ASSETS, PERSONAS } from '../src/simulation.ts';
 import { generateFallbackActions } from '../src/wealth-agent.js';
 
@@ -21,6 +22,7 @@ const cache = new Map();
 
 export default async function handler(request, response) {
   if (request.method !== 'POST') return response.status(405).json({ error: 'Method not allowed.' });
+  if (!await requireSignedInUser(request, response)) return;
   const body = request.body && typeof request.body === 'object' ? request.body : {};
   const context = normalizeContext(body);
   if (!context) return response.status(400).json({ error: 'Complete simulated portfolio context is required.' });
@@ -73,6 +75,10 @@ function normalizeContext(body) {
   const persona = PERSONAS.find(person => person.id === id);
   const risk = ['aggressive', 'balanced', 'conservative'].includes(body.profile?.risk) ? body.profile.risk : persona?.risk;
   if (!persona || !risk) return null;
+  const profileName = typeof body.profile?.name === 'string' ? body.profile.name.trim().slice(0, 48) : '';
+  const profileGoal = typeof body.profile?.goal === 'string' ? body.profile.goal.trim().slice(0, 120) : '';
+  const age = Number.isInteger(Number(body.profile?.age)) ? bounded(body.profile.age, 13, 100) : persona.age;
+  const horizonYears = Number.isInteger(Number(body.profile?.horizonYears)) ? bounded(body.profile.horizonYears, 1, 60) : persona.horizonYears;
   const cash = bounded(body.portfolio?.cash, 0, 2_000_000);
   const holdings = Array.isArray(body.portfolio?.holdings) ? body.portfolio.holdings.filter(item => ASSETS[item?.ticker]).slice(0, 10).map(item => ({ ticker: item.ticker, quantity: bounded(item.quantity, 0, 1_000_000), marketValue: bounded(item.marketValue, 0, 2_000_000) })) : [];
   const netWorth = bounded(body.portfolio?.netWorth, 0, 2_000_000);
@@ -80,7 +86,7 @@ function normalizeContext(body) {
   const history = body.history && typeof body.history === 'object' ? Object.fromEntries(Object.keys(ASSETS).map(ticker => [ticker, Array.isArray(body.history[ticker]) ? body.history[ticker].slice(-30).map(point => ({ date: String(point.date || '').slice(0, 10), close: bounded(point.close, 0, 1_000_000) })) : []])) : {};
   const events = Array.isArray(body.events) ? body.events.slice(-8).map(item => ({ headline: String(item.headline || '').slice(0, 140), date: String(item.date || '').slice(0, 10), tickers: Array.isArray(item.tickers) ? item.tickers.filter(ticker => ASSETS[ticker]).slice(0, 10) : [] })) : [];
   const lastDecisions = Array.isArray(body.lastDecisions) ? body.lastDecisions.slice(0, 5).map(item => ({ type: String(item.type || '').slice(0, 20), ticker: String(item.ticker || '').slice(0, 12), reason: String(item.reason || '').slice(0, 120), status: String(item.status || '').slice(0, 20) })) : [];
-  return { accountId: persona.id, profile: { name: persona.name, age: persona.age, goal: persona.goal, risk, horizonYears: persona.horizonYears, cashBuffer: persona.cashBuffer }, portfolio: { cash, netWorth, holdings }, history, events, lastDecisions };
+  return { accountId: persona.id, profile: { name: profileName || persona.name, age, occupation: String(body.profile?.occupation || persona.occupation).slice(0, 48), goal: profileGoal || persona.goal, risk, horizonYears, cashBuffer: persona.cashBuffer }, portfolio: { cash, netWorth, holdings }, history, events, lastDecisions };
 }
 
 function sendFallback(response, context, reason) {
