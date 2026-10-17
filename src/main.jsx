@@ -514,7 +514,8 @@ function App() {
     { label: 'Tools', page: 'Tools', icon: Wrench },
     { label: 'Portfolio', page: 'Portfolio', icon: BriefcaseBusiness },
   ];
-  const activePageLabel = pages.find(item => item.page === activePage)?.label || activePage;
+  const accountPages = persona === 'Kid' ? pages.filter(item => item.page !== 'Wealth') : pages;
+  const activePageLabel = accountPages.find(item => item.page === activePage)?.label || activePage;
   const savedAccount = readAccountProfile();
 
   if (!accountProfile) {
@@ -527,7 +528,7 @@ function App() {
     <aside className="sidebar">
       <a className="brand sidebar-brand" href="#top" aria-label="Velora overview"><span className="brand-mark"><span/><span/><span/></span><span>velora</span></a>
       <div className="sidebar-section-label">WORKSPACE</div>
-      <nav className="sidebar-nav" aria-label="Main navigation">{pages.map(({ label, page, icon: Icon }) => <button key={page} className={activePage === page ? 'sidebar-link active' : 'sidebar-link'} onClick={() => setActivePage(page)} aria-current={activePage === page ? 'page' : undefined}><Icon size={18}/><span>{persona === 'Kid' && label === 'Portfolio' ? 'My stocks' : label}</span></button>)}</nav>
+      <nav className="sidebar-nav" aria-label="Main navigation">{accountPages.map(({ label, page, icon: Icon }) => <button key={page} className={activePage === page ? 'sidebar-link active' : 'sidebar-link'} onClick={() => setActivePage(page)} aria-current={activePage === page ? 'page' : undefined}><Icon size={18}/><span>{persona === 'Kid' && label === 'Portfolio' ? 'My stocks' : label}</span></button>)}</nav>
       {persona === 'Kid' && <div className="kid-glossary"><b>Money words</b><p><strong>Stock</strong> · a tiny piece of a company.</p><p><strong>Price</strong> · what one piece costs right now.</p><p><strong>Paper money</strong> · pretend dollars for practice.</p><p><strong>Risk</strong> · the chance your pretend money goes down.</p></div>}
       <div className="sidebar-bottom"><button className="theme-toggle" onClick={toggleColorMode}><span className="theme-toggle-icon">{darkMode ? <Sun size={16}/> : <Moon size={16}/>}</span>{darkMode ? 'Light mode' : 'Dark mode'}</button><div className="sidebar-profile"><span className="locked-account-avatar">{(accountProfile?.firstName || persona).slice(0, 1).toUpperCase()}</span><span><b>{accountProfile?.firstName || `${persona} account`}</b><small>{persona} account</small></span></div></div>
     </aside>
@@ -538,7 +539,7 @@ function App() {
     <main id="top" className="dashboard">
       <div className="page-title-row" style={{ display: activePage === 'Wealth' ? 'none' : undefined }}><div><div className="eyebrow">{activePage === 'Trading' ? 'YOUR AI MONEY ASSISTANT' : activePageLabel.toUpperCase()}</div><h1>{activePage === 'Overview' ? (accountProfile?.firstName ? `Welcome, ${accountProfile.firstName}` : displayName) : activePage === 'Trading' ? 'AI ideas, with your say' : activePageLabel}</h1><p>{activePage === 'Overview' ? personaCopy : activePage === 'Trading' ? 'A sample account is ready. Choose an amount and comfort level. AI explains each idea; you approve every practice order.' : activePage === 'WhatIf' ? 'Explore how a goal or purchase could affect your account, then get age-appropriate ideas from your coach.' : activePage === 'Portfolio' ? 'Your practice cash, stocks, and recent decisions.' : activePage === 'Markets' ? 'Explore simulated prices and company details.' : activePage === 'Planning' ? 'Plan upcoming money in and money out.' : activePage === 'Tools' ? 'Explore guarded tools for your practice account.' : activePage}</p></div><span className="page-persona-tag">{linkedAccount ? 'Plaid Sandbox' : 'Practice account'} · {persona}</span></div>
       <div className="page-content">
-      {activePage === 'Wealth' && <WealthManager userAccount={accountProfile}/>}
+      {activePage === 'Wealth' && persona !== 'Kid' && <WealthManager userAccount={accountProfile}/>}
       <div style={{ display: activePage === 'Trading' ? 'block' : 'none' }} aria-hidden={activePage !== 'Trading'}><TradingDesk key={accountProfile?.id || 'no-account'} autoStart={Boolean(accountProfile)} onAiStatus={setAiStatus}/></div>
       {activePage === 'WhatIf' && <WhatIfCoach persona={persona} cash={whatIfCash - purchase} income={income} bills={bills} safeSurplus={safeSurplus} projectedLow={lowestBalance} reserve={reserve}/>}
       {activePage === 'Overview' && <>
