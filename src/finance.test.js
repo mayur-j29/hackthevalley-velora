@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildForecast, calculateDebtPayoff, evaluateSimulatedTrade, executePaperOrder, getSafeSurplus, simulateAutoInvest, simulateHistoricalInvestment, startingBalance } from './finance.js';
+import { buildForecast, calculateDebtPayoff, evaluateMovingAverageCrossover, evaluateSimulatedTrade, executePaperOrder, getSafeSurplus, simulateAutoInvest, simulateHistoricalInvestment, startingBalance } from './finance.js';
 
 test('forecast includes all scheduled cash events and preserves its start balance', () => {
   const sampleEvents = [{ day: 8, title: 'Payday', amount: 2450, kind: 'income' }, { day: 26, title: 'Rent', amount: -1850, kind: 'bill' }];
@@ -95,6 +95,14 @@ test('paper orders block rails-off, excess buying power, oversells, and missing 
   assert.equal(order({}).ok, false);
   assert.equal(executePaperOrder({ portfolio, symbol: 'MSFT', side: 'sell', shares: 2, price: 90, safeSurplus: 500, railsEnabled: true }).ok, false);
   assert.equal(executePaperOrder({ portfolio, symbol: 'MSFT', side: 'sell', shares: 1, price: 0, safeSurplus: 500, railsEnabled: true }).ok, false);
+});
+
+test('moving-average paper strategy emits only deterministic crossover observations', () => {
+  assert.equal(evaluateMovingAverageCrossover([5, 4, 3, 2, 1, 2, 3, 4], 7, false), 'buy');
+  assert.equal(evaluateMovingAverageCrossover([1, 2, 3, 4, 5, 4, 3, 2], 7, true), 'sell');
+  assert.equal(evaluateMovingAverageCrossover([1, 2, 3, 4, 5, 6], 5, false), 'buy');
+  assert.equal(evaluateMovingAverageCrossover([1, 2, 3, 4], 3, false), 'hold');
+  assert.equal(evaluateMovingAverageCrossover([1, 2, Number.NaN, 4, 5, 6], 5, false), 'hold');
 });
 
 test('a fresh profile starts with zero cash and no scheduled transactions', () => {

@@ -4,6 +4,7 @@ import { Activity, ArrowDownLeft, ArrowUpRight, Bell, Check, ChevronDown, Circle
 import { buildForecast, crashScenarios, evaluateSimulatedTrade, getSafeSurplus, simulateAutoInvest, startingBalance } from './finance';
 import MarketReplay from './MarketReplay';
 import PaperPortfolio from './PaperPortfolio';
+import TradingDesk from './TradingDesk';
 import { CashCalendar, DebtPlanner, sampleDebtPayments } from './PlanningTools';
 import './styles.css';
 import './planning.css';
@@ -384,6 +385,7 @@ function App() {
 
   const pages = [
     { label: 'Overview', icon: LayoutDashboard },
+    { label: 'Trading', icon: Activity },
     { label: 'Markets', icon: CandlestickChart },
     { label: 'Portfolio', icon: BriefcaseBusiness },
     { label: 'Planning', icon: CalendarDays },
@@ -403,7 +405,8 @@ function App() {
       <div className="top-actions"><span className="status"><i/> {linkedAccount ? 'Sandbox bank linked' : 'No bank linked'}</span><span className="engine"><Sparkles size={13}/> Gemini {aiStatus === 'live' ? 'connected' : 'optional'}</span><button className="new-account-button" onClick={createNewAccount}>New account</button><button className="icon-btn" aria-label="Notifications"><Bell size={18}/></button><button className="avatar" aria-label="Account profile">{(accountProfile?.firstName || persona).slice(0, 1).toUpperCase()}</button></div>
     </header>
     <main id="top" className="dashboard">
-      <div className="page-title-row"><div><div className="eyebrow">{activePage.toUpperCase()}</div><h1>{activePage === 'Overview' ? (accountProfile?.firstName ? `Welcome, ${accountProfile.firstName}` : displayName) : activePage === 'Markets' && persona === 'Kid' ? 'Stock shop' : activePage}</h1><p>{activePage === 'Overview' ? personaCopy : activePage === 'Markets' ? (persona === 'Kid' ? 'See what company prices are doing. Practice with pretend money.' : 'Explore intraday prices and historical market moves.') : activePage === 'Portfolio' ? 'Your pretend cash, investments, and practice orders.' : activePage === 'Planning' ? 'Plan upcoming money in and money out.' : 'Extra ways to explore your plan.'}</p></div><span className="page-persona-tag">{persona} account · Paper mode</span></div>
+      <div className="page-title-row"><div><div className="eyebrow">{activePage.toUpperCase()}</div><h1>{activePage === 'Overview' ? (accountProfile?.firstName ? `Welcome, ${accountProfile.firstName}` : displayName) : activePage === 'Markets' && persona === 'Kid' ? 'Stock shop' : activePage}</h1><p>{activePage === 'Overview' ? personaCopy : activePage === 'Trading' ? 'A visible, accelerated replay with fictional bank cash and paper-only orders.' : activePage === 'Markets' ? (persona === 'Kid' ? 'See what company prices are doing. Practice with pretend money.' : 'Explore intraday prices and historical market moves.') : activePage === 'Portfolio' ? 'Your pretend cash, investments, and practice orders.' : activePage === 'Planning' ? 'Plan upcoming money in and money out.' : 'Extra ways to explore your plan.'}</p></div><span className="page-persona-tag">{persona} account · Paper mode</span></div>
+      {activePage === 'Trading' && <TradingDesk autoStart/>}
       {activePage === 'Overview' && <>
       <section className="summary-grid" aria-label={`${persona} account overview`}>
         <article className="summary-card balance-card"><div className="card-topline"><span>{persona === 'Kid' ? 'Pretend cash' : linkedAccount ? 'Sandbox bank balance' : 'Available account cash'}</span><CircleHelp size={15}/></div><div className="balance-amount">{money(accountBalance-purchase,2)}</div><div className="balance-foot"><span className="up-label"><TrendingUp size={14}/> {linkedAccount ? 'Plaid Sandbox' : persona === 'Kid' ? 'Practice account' : 'Fresh start'}</span><span>{linkedAccount ? `${linkedAccount.currency} · •••• ${linkedAccount.mask}` : 'No opening balance'}</span></div><div className="balance-spark"><svg viewBox="0 0 140 42"><path d="M1 32 C18 26 18 33 33 25 S55 28 65 17 S84 23 98 12 S116 19 139 3" fill="none" stroke="#70b69a" strokeWidth="2"/></svg></div></article>

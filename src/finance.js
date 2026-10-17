@@ -135,6 +135,20 @@ export function executePaperOrder({ portfolio, symbol, side, shares, price, safe
   };
 }
 
+export function evaluateMovingAverageCrossover(prices, index, hasPosition, fastWindow = 3, slowWindow = 5) {
+  if (!Array.isArray(prices) || !Number.isInteger(index) || index < slowWindow || fastWindow < 1 || slowWindow <= fastWindow) return 'hold';
+  const valid = prices.slice(0, index + 1).map(Number);
+  if (valid.some(price => !Number.isFinite(price) || price <= 0)) return 'hold';
+  const averageAt = (end, size) => valid.slice(end - size + 1, end + 1).reduce((sum, price) => sum + price, 0) / size;
+  const previousFast = averageAt(index - 1, fastWindow);
+  const previousSlow = averageAt(index - 1, slowWindow);
+  const currentFast = averageAt(index, fastWindow);
+  const currentSlow = averageAt(index, slowWindow);
+  if (!hasPosition && currentFast > currentSlow && (previousFast <= previousSlow || index === slowWindow)) return 'buy';
+  if (hasPosition && previousFast >= previousSlow && currentFast < currentSlow) return 'sell';
+  return 'hold';
+}
+
 export function getSafeSurplus(forecast, reserve = essentialReserve) {
   const lowestBalance = Math.min(...forecast.map(point => point.value));
   return { lowestBalance, safeSurplus: Math.max(0, Math.floor(lowestBalance - reserve)) };
