@@ -1,127 +1,70 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowDownLeft, ArrowUpRight, BadgeCheck, BriefcaseBusiness, CircleDollarSign, RefreshCw, ShieldCheck, Wallet } from 'lucide-react';
-import { executePaperOrder } from './finance';
+import { Activity, ArrowDownLeft, ArrowUpRight, BriefcaseBusiness, CircleHelp, RefreshCw, ShieldCheck, Wallet } from 'lucide-react';
+import { readPaperAccount, subscribePaperAccount } from './paperAccount';
 import './portfolio.css';
 
-const assets = [
-  { symbol: 'SPY', label: 'S&P 500 ETF proxy', name: 'SPDR S&P 500 ETF' },
-  { symbol: 'AAPL', label: 'Apple', name: 'Apple Inc.' },
-  { symbol: 'MSFT', label: 'Microsoft', name: 'Microsoft Corp.' },
-  { symbol: 'TSLA', label: 'Tesla', name: 'Tesla Inc.' },
-];
-const initialPortfolio = { cash: 0, positions: {}, orders: [] };
-const currency = (value, digits = 2) => `$${new Intl.NumberFormat('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(value)}`;
+const money = value => `$${new Intl.NumberFormat('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value) || 0)}`;
+const tickerName = symbol => String(symbol).split(':')[0];
 
-export default function PaperPortfolio({ safeSurplus, rails, persona = 'Adult', virtualCash = 0, onCashChange = () => {} }) {
-  const [portfolio, setPortfolio] = useState(() => {
-    try {
-      const saved = JSON.parse(window.localStorage.getItem('velora-paper-portfolio') || 'null');
-      if (saved && Number.isFinite(Number(saved.cash)) && saved.positions && Array.isArray(saved.orders)) return saved;
-    } catch { /* Reset invalid demo state below. */ }
-    return initialPortfolio;
-  });
+export default function PaperPortfolio() {
+  const [account, setAccount] = useState(readPaperAccount);
   const [quotes, setQuotes] = useState({});
-  const [quoteLoading, setQuoteLoading] = useState(true);
-  const [quoteError, setQuoteError] = useState('');
-  const [refreshKey, setRefreshKey] = useState(0);
-  const [symbol, setSymbol] = useState('SPY');
-  const [side, setSide] = useState('buy');
-  const [shares, setShares] = useState('0.1');
-  const [message, setMessage] = useState(null);
-  const [incomeAmount, setIncomeAmount] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [refresh, setRefresh] = useState(0);
+  const positions = useMemo(() => Object.entries(account.positions || {}).map(([symbol, position]) => {
+    const mark = Number(quotes[symbol]) || Number(position.mark) || Number(position.entryPrice) || 0;
+    const shares = Number(position.shares) || 0;
+    const averageCost = Number(position.entryPrice) || 0;
+    const marketValue = mark * shares;
+    const cost = averageCost * shares;
+    return { symbol, shares, mark, averageCost, marketValue, cost, pnl: marketValue - cost };
+  }), [account.positions, quotes]);
+  const investmentCash = Number(account.bankCash || 0) + Number(account.cash || 0);
+  const holdingsValue = positions.reduce((sum, item) => sum + item.marketValue, 0);
+  const totalValue = investmentCash + holdingsValue;
+  const netPnl = Number(account.realizedPnl || 0) + positions.reduce((sum, item) => sum + item.pnl, 0);
+
+  useEffect(() => subscribePaperAccount(setAccount), []);
 
   useEffect(() => {
-    try { window.localStorage.setItem('velora-paper-portfolio', JSON.stringify(portfolio)); }
-    catch { /* The account remains usable for this browser session. */ }
-    onCashChange(portfolio.cash);
-  }, [portfolio]);
-
-  useEffect(() => {
-    if (Number(portfolio.cash) !== Number(virtualCash)) setPortfolio(current => ({ ...current, cash: Number(virtualCash) || 0 }));
-  }, [virtualCash]);
-
-  useEffect(() => {
-    try { window.localStorage.removeItem('velora-auto-invest'); } catch { /* No saved schedule can be cleared in this browser. */ }
-  }, []);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    async function loadQuotes() {
-      setQuoteLoading(true);
-      setQuoteError('');
-      try {
-        const response = await fetch('/api/market?symbols=SPY,AAPL,MSFT,TSLA&range=1d', { signal: controller.signal });
-        const data = await response.json();
-        if (!response.ok || !Array.isArray(data.quotes)) throw new Error(data.error || 'Market prices are unavailable.');
-        setQuotes(Object.fromEntries(data.quotes.map(quote => [quote.symbol, quote])));
-      } catch (error) {
-        if (!controller.signal.aborted) setQuoteError(error.message || 'Unable to refresh portfolio prices.');
-      } finally {
-        if (!controller.signal.aborted) setQuoteLoading(false);
-      }
-    }
-    loadQuotes();
-    return () => controller.abort();
-  }, [refreshKey]);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setRefreshKey(value => value + 1), 60_000);
+    const timer = window.setInterval(() => setRefresh(value => value + 1), 60_000);
     return () => window.clearInterval(timer);
   }, []);
 
-  const marks = useMemo(() => Object.fromEntries(assets.map(asset => [asset.symbol, quotes[asset.symbol]?.points?.at(-1)?.close || null])), [quotes]);
-  const positionRows = assets.map(asset => {
-    const position = portfolio.positions[asset.symbol] || { shares: 0, averageCost: 0 };
-    const mark = marks[asset.symbol];
-    const marketValue = mark ? Number(position.shares) * mark : 0;
-    const bookValue = Number(position.shares) * Number(position.averageCost);
-    return { ...asset, ...position, mark, marketValue, bookValue, profitLoss: marketValue - bookValue };
-  });
-  const positionsValue = positionRows.reduce((sum, position) => sum + position.marketValue, 0);
-  const totalValue = Number(portfolio.cash) + positionsValue;
-  const selectedAsset = assets.find(asset => asset.symbol === symbol);
-  const selectedPrice = marks[symbol];
-  const proposedAmount = (Number(shares) || 0) * (selectedPrice || 0);
-  const availableToPaperTrade = Math.max(0, Math.min(Number(safeSurplus) || 0, Number(portfolio.cash) || 0));
+  useEffect(() => {
+    const symbols = Object.keys(account.positions || {});
+    if (!symbols.length) { setQuotes({}); setError(''); setLoading(false); return undefined; }
+    const controller = new AbortController();
+    setLoading(true);
+    setError('');
+    const params = new URLSearchParams({ symbols: symbols.join(','), range: '1d' });
+    fetch(`/api/market?${params}`, { signal: controller.signal })
+      .then(async response => {
+        const data = await response.json();
+        if (!response.ok || !Array.isArray(data.quotes)) throw new Error(data.error || 'Latest prices could not be loaded.');
+        setQuotes(Object.fromEntries(data.quotes.map(quote => [quote.symbol, Number(quote.points?.at(-1)?.close) || 0])));
+      })
+      .catch(fetchError => { if (!controller.signal.aborted) setError(fetchError.message || 'Latest prices could not be loaded.'); })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
+  }, [account.positions, refresh]);
 
-  function recordVirtualIncome(event) {
-    event.preventDefault();
-    const amount = Number(incomeAmount);
-    if (!Number.isFinite(amount) || amount <= 0) {
-      setMessage({ type: 'error', text: 'Enter income greater than $0.' });
-      return;
-    }
-    const nextPortfolio = { ...portfolio, cash: Number((portfolio.cash + amount).toFixed(2)) };
-    setPortfolio(nextPortfolio);
-    onCashChange(nextPortfolio.cash);
-    setIncomeAmount('');
-    setMessage({ type: 'success', text: `${currency(amount)} added to account cash.` });
-  }
-
-  function placePaperOrder(event) {
-    event.preventDefault();
-    const price = marks[symbol];
-    const result = executePaperOrder({ portfolio, symbol, side, shares, price, safeSurplus, railsEnabled: rails });
-    if (!result.ok) {
-      setMessage({ type: 'error', text: result.reason });
-      return;
-    }
-    setPortfolio(result.portfolio);
-    onCashChange(result.portfolio.cash);
-    setMessage({ type: 'success', text: `${side === 'buy' ? 'Bought' : 'Sold'} ${Number(shares)} ${symbol} share${Number(shares) === 1 ? '' : 's'} at ${currency(price)}.` });
-  }
-
-
-  return <section className="panel portfolio-panel" aria-labelledby="portfolio-title">
-    <div className="portfolio-head"><div><div className="eyebrow">INVESTMENT ACCOUNT</div><h2 id="portfolio-title">Your portfolio, built from zero.</h2><p>Add income to track account cash and get started with investments.</p></div><button className="portfolio-refresh" onClick={() => setRefreshKey(value => value + 1)} disabled={quoteLoading} aria-label="Refresh market prices"><RefreshCw size={15}/></button></div>
-    <div className="portfolio-summary"><div className="portfolio-value-card"><span><BriefcaseBusiness size={14}/> Total portfolio value</span><b>{currency(totalValue)}</b><small>Account cash + investments at latest available price</small></div><div className="portfolio-metric"><span><Wallet size={14}/> Account cash</span><b>{currency(portfolio.cash)}</b><small>{portfolio.cash > 0 ? 'Income added to this account' : 'Fresh start · $0.00'}</small></div><div className="portfolio-metric"><span><CircleDollarSign size={14}/> Safe to deploy</span><b>{currency(availableToPaperTrade, 0)}</b><small>Lower of account cash and forecast safe surplus</small></div></div>
-    {quoteLoading && <div className="portfolio-load" role="status"><span/><b>Refreshing real price marks…</b></div>}
-    {!quoteLoading && quoteError && <div className="portfolio-warning" role="status">{quoteError} Existing ledger is unchanged; try refreshing prices.</div>}
-    {positionRows.some(position => Number(position.shares) > 0) ? <div className="portfolio-table"><div className="portfolio-table-head"><span>ASSET</span><span>SHARES</span><span>AVG. COST</span><span>LIVE PRICE</span><span>MARKET VALUE</span><span>YOUR CHANGE</span></div>{positionRows.filter(position => Number(position.shares) > 0).map(position => <div className="portfolio-row" key={position.symbol}><span className="portfolio-asset"><b>{position.symbol}</b><small>{position.name}</small></span><span>{Number(position.shares).toFixed(4)}</span><span>{currency(position.averageCost)}</span><span>{position.mark ? currency(position.mark) : '—'}</span><b>{currency(position.marketValue)}</b><b className={position.profitLoss >= 0 ? 'portfolio-positive' : 'portfolio-negative'}>{position.mark ? <>{position.profitLoss >= 0 ? '+' : '−'}{currency(Math.abs(position.profitLoss))}<small>{position.bookValue ? `${position.profitLoss >= 0 ? '+' : ''}${(position.profitLoss / position.bookValue * 100).toFixed(2)}% from your buy price` : 'from your buy price'}</small></> : '—'}</b></div>)}</div> : <div className="portfolio-empty"><BriefcaseBusiness size={17}/><span><b>No investments yet</b><small>Your holdings will appear here after you place an order or set up a recurring investment.</small></span></div>}
-    <form className="paper-income-form" onSubmit={recordVirtualIncome}><div><b>Add account cash</b><small>Add income or an opening amount to your account.</small></div><label><span>INCOME</span><div className="amount-input"><b>$</b><input type="number" min="1" step="0.01" value={incomeAmount} onChange={event => setIncomeAmount(event.target.value)} placeholder="0.00" aria-label="Income amount"/></div></label><button type="submit" className="income-record-button">Add income <ArrowDownLeft size={14}/></button></form>
-    <form className="paper-order-form" onSubmit={placePaperOrder}><div className="paper-order-heading"><div><BadgeCheck size={16}/><span><b>Investment order</b><small>Checks your available balance before updating your portfolio</small></span></div></div><label><span>SIDE</span><select value={side} onChange={event => setSide(event.target.value)}><option value="buy">Buy</option><option value="sell">Sell</option></select></label><label><span>ASSET</span><select value={symbol} onChange={event => setSymbol(event.target.value)}>{assets.map(asset => <option key={asset.symbol} value={asset.symbol}>{asset.symbol} · {asset.label}</option>)}</select></label><label><span>SHARES</span><input type="number" min="0.0001" step="0.0001" value={shares} onChange={event => setShares(event.target.value)}/></label><div className="paper-order-estimate"><small>ESTIMATED VALUE</small><b>{selectedPrice ? currency(proposedAmount) : 'Load price marks'}</b><span>{selectedAsset.name} · {selectedPrice ? `${currency(selectedPrice)} per share` : 'quote unavailable'}</span></div><button className="paper-order-submit" type="submit" disabled={quoteLoading || !selectedPrice || !rails}>{side === 'buy' ? <ArrowDownLeft size={15}/> : <ArrowUpRight size={15}/>} Place {side}</button></form>
-    {!rails && <div className="portfolio-warning"><ShieldCheck size={14}/> Rails are off. The ledger remains visible, but new buy and sell orders are blocked.</div>}
-    {message && <div className={`portfolio-message ${message.type}`} role="status">{message.text}</div>}
-    {portfolio.orders.length > 0 && <div className="paper-order-history"><b>Recent orders</b>{portfolio.orders.slice(0, 4).map(order => <div key={order.id}><span className={order.side}>{order.side.toUpperCase()}</span><span>{order.shares} {order.symbol}</span><span>{currency(order.amount)}</span><small>{new Date(order.createdAt).toLocaleString()}</small></div>)}</div>}
+  return <section className="panel shared-portfolio" aria-labelledby="portfolio-title">
+    <header className="shared-portfolio-head"><div><div className="eyebrow">ONE ACCOUNT · SAME AS AI TRADING</div><h2 id="portfolio-title">Your portfolio</h2><p>Checking cash, investing cash, stock holdings, and orders all come from the same demo account.</p></div><button className="portfolio-refresh" onClick={() => setRefresh(value => value + 1)} disabled={loading} aria-label="Refresh stock prices"><RefreshCw size={15}/></button></header>
+    <div className="shared-portfolio-summary">
+      <article className="shared-total"><span><BriefcaseBusiness size={15}/> Total account value</span><b>{money(totalValue)}</b><small>Demo bank + investing cash + stock holdings</small></article>
+      <article><span><LandmarkIcon/> Demo bank cash</span><b>{money(account.bankCash)}</b><small>Available to move into the strategy</small></article>
+      <article><span><Wallet size={15}/> Investing cash</span><b>{money(account.cash)}</b><small>Available to the AI strategy</small></article>
+      <article><span><Activity size={15}/> Practice result</span><b className={netPnl >= 0 ? 'portfolio-positive' : 'portfolio-negative'}>{netPnl >= 0 ? '+' : '−'}{money(Math.abs(netPnl))}</b><small>Based on saved fills and latest marks</small></article>
+    </div>
+    {loading && <div className="shared-portfolio-note" role="status"><span/> Updating stock prices…</div>}
+    {error && <div className="portfolio-warning" role="status">{error} The last saved prices are still shown.</div>}
+    {positions.length ? <div className="shared-holdings"><div className="shared-holdings-head"><span>STOCK</span><span>SHARES</span><span>AVG. COST</span><span>LAST PRICE</span><span>VALUE</span><span>CHANGE</span></div>{positions.map(item => <article key={item.symbol}><span><b>{tickerName(item.symbol)}</b><small>{item.symbol.includes(':') ? item.symbol.split(':')[1] : 'Market'}</small></span><span>{item.shares.toFixed(4)}</span><span>{money(item.averageCost)}</span><span>{money(item.mark)}</span><b>{money(item.marketValue)}</b><strong className={item.pnl >= 0 ? 'portfolio-positive' : 'portfolio-negative'}>{item.pnl >= 0 ? '+' : '−'}{money(Math.abs(item.pnl))}</strong></article>)}</div> : <div className="shared-portfolio-empty"><BriefcaseBusiness size={18}/><span><b>No stock holdings yet</b><small>When the strategy places a practice order, the holding will appear here automatically.</small></span></div>}
+    <section className="shared-orders"><div className="shared-section-heading"><div><b>Recent AI decisions</b><small>Suggestions and final actions from the trading tab</small></div><span>{account.decisions?.length || 0} decisions</span></div>{account.decisions?.length ? account.decisions.slice(0, 5).map(item => <article key={item.id}><span className={`shared-action ${String(item.action).toLowerCase()}`}>{item.action}</span><div><b>{tickerName(item.symbol)} · {money(item.price)}</b><small>AI suggested {item.suggestedAction || item.action} · final action {item.action}</small></div><time>{item.time ? new Date(item.time).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'Recently'}</time></article>) : <p className="shared-portfolio-muted">The first decision will show here after the next market scan.</p>}</section>
+    {account.fills?.length > 0 && <section className="shared-orders"><div className="shared-section-heading"><div><b>Recent practice orders</b><small>Fills made by the strategy</small></div><span>{account.fills.length} orders</span></div>{account.fills.slice(0, 5).map(fill => <article key={fill.id}><span className={`shared-action ${fill.side}`}>{fill.side === 'buy' ? <ArrowDownLeft size={13}/> : <ArrowUpRight size={13}/>} {fill.side.toUpperCase()}</span><div><b>{tickerName(fill.symbol)} · {Number(fill.shares).toFixed(4)} shares</b><small>{money(fill.price)} per share · {fill.reason || 'Strategy practice order'}</small></div><time>{fill.time ? new Date(fill.time).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'Recently'}</time></article>)}</section>}
+    <div className="shared-portfolio-foot"><ShieldCheck size={14}/><span>The bank and orders shown here are a demo account. No real bank or brokerage is connected.</span><CircleHelp size={14}/></div>
   </section>;
 }
+
+function LandmarkIcon() { return <BriefcaseBusiness size={15}/>; }
