@@ -155,3 +155,72 @@
   .market-watch-card { padding:11px; }
   .market-watch-card>b { font-size:16px; }
 }
+
+/* Dark mode uses a single readable field palette across every form and nested tool. */
+.app-shell[data-theme="dark"] {
+  --field-bg:#151f19;
+  --field-border:#455b4d;
+  --field-text:#f0f5f1;
+  --field-muted:#b5c2b8;
+  color-scheme:dark;
+}
+.app-shell[data-theme="dark"] :is(input,select,textarea) {
+  color:var(--field-text) !important;
+  background-color:var(--field-bg) !important;
+  border-color:var(--field-border) !important;
+  caret-color:#a4ddb4;
+  color-scheme:dark;
+}
+.app-shell[data-theme="dark"] :is(input,textarea)::placeholder { color:#a5b4aa !important; opacity:1; }
+.app-shell[data-theme="dark"] select option { background:#1a261f; color:#f0f5f1; }
+.app-shell[data-theme="dark"] :is(.amount-input,.select-wrap,.debt-input,.copilot-form,.purchase-input,.paper-order-estimate,.impact-box,.quick-picks button,.prompt-chips button,.calendar-add-form label>input,.extra-payment .amount-input) {
+  color:var(--field-text);
+  background-color:var(--field-bg);
+  border-color:var(--field-border);
+}
+.app-shell[data-theme="dark"] :is(.market-controls .select-wrap,.market-replay-form .amount-input,.paper-order-form>label>select,.paper-order-form>label>input,.paper-income-form .amount-input,.auto-invest-controls label>select,.auto-invest-controls .amount-input,.calendar-add-form .select-wrap,.calendar-add-form .amount-input) {
+  color:var(--field-text);
+  background-color:var(--field-bg);
+  border-color:var(--field-border);
+}
+.app-shell[data-theme="dark"] :is(.market-controls .select-wrap select,.auto-invest-controls select,.calendar-add-form .select-wrap select) { background:transparent !important; }
+.app-shell[data-theme="dark"] :is(.amount-input b,.paper-order-estimate>b,.impact-row b,.purchase-input>span) { color:#eff7f0; }
+.app-shell[data-theme="dark"] :is(.market-quote,.market-loading,.market-replay-form,.market-safe-cap,.market-error,.market-verdict,.market-ai-review,.market-rails-off,.replay-result,.agent-progress,.agent-result,.agent-review,.automation-result,.copilot-message,.portfolio-empty,.portfolio-warning,.portfolio-message,.portfolio-value-card,.portfolio-metric,.paper-income-form,.paper-order-form,.auto-invest-schedule,.debt-summary>div,.debt-interest-note,.subscriptions-empty,.nudge,.bank-connect-callout,.linked-bank-row,.plaid-message,.sandbox-rules-message,.transfer-row) {
+  background-color:#202e26;
+  border-color:#3b5144;
+  color:#edf4ef;
+}
+.app-shell[data-theme="dark"] :is(.market-quote b,.market-loading b,.market-error b,.market-verdict b,.agent-progress b,.agent-result b,.agent-review-title,.agent-review p,.portfolio-head h2,.portfolio-value-card>b,.portfolio-metric>b,.portfolio-empty b,.portfolio-warning b,.paper-order-heading b,.paper-income-form b,.auto-invest-header b,.debt-summary b,.debt-row-name b,.calendar-entry-name b,.bank-connect-callout b,.linked-bank-row b,.transfer-row b,.subscriptions-empty b,.nudge p,.copilot-message p,.message-meta,.impact-heading,.impact-row,.impact-message) { color:#edf4ef; }
+.app-shell[data-theme="dark"] :is(.market-controls label>span,.market-replay-form label>span,.market-data-meta,.market-loading small,.market-error small,.market-verdict small,.market-boundary,.portfolio-head p,.portfolio-summary small,.portfolio-table-head,.portfolio-row,.portfolio-empty small,.portfolio-boundary,.paper-order-heading small,.paper-order-form>label>span,.paper-order-estimate>small,.paper-order-estimate>span,.paper-income-form small,.auto-invest-header small,.auto-invest-footer,.debt-summary span,.debt-row,.debt-interest-note,.calendar-entry-name small,.calendar-note,.section-description,.copilot-panel .ai-boundary,.ai-footnote,.subscription-total,.service-name small,.nudge-label,.bank-connect-callout small,.linked-bank-row small,.linked-bank-balance span,.transfer-row small,.page-footer) { color:#b2c0b6; }
+.app-shell[data-theme="dark"] :is(.market-table-head,.portfolio-table-head,.debt-table-head) { background:#26372d; color:#d0dcd2; }
+.app-shell[data-theme="dark"] :is(.portfolio-row,.debt-row,.calendar-entry,.transfer-row,.paper-order-history>div) { border-color:#374a3e; }
+.app-shell[data-theme="dark"] :is(.calendar-list,.debt-table,.portfolio-table,.paper-order-history>div,.transfer-list) { border-color:#3b5144; }
+.app-shell[data-theme="dark"] :is(.copilot-panel,.automation-panel,.decision-panel,.subscriptions-panel,.calendar-panel,.debt-panel,.bank-transfer-panel,.market-panel,.portfolio-panel) { background:#202d26; color:#edf4ef; }
+.app-shell[data-theme="dark"] .copilot-panel:after { opacity:.08; }
+.app-shell[data-theme="dark"] :is(.section-title h2,.panel-heading h2,.market-head h2,.page-title-row h1,.portfolio-head h2) { color:#edf4ef; }
+.app-shell[data-theme="dark"] :is(.chart-line,.live-price-line) { stroke:#8bdda2; }
+.app-shell[data-theme="dark"] :is(.grid-line,.zero-line,.replay-grid,.event-line) { stroke:#405347; }
+.app-shell[data-theme="dark"] .copilot-form { border:1px solid var(--field-border); }
+.app-shell[data-theme="dark"] :is(.copilot-form button,.market-replay-button,.paper-order-submit,.connect-plaid-button,.sandbox-transfer-button,.calendar-add-button,.setup-continue) { color:#fff; }
+.app-shell[data-theme="dark"] :is(.auto-invest-controls select:disabled,.auto-invest-controls input:disabled) { color:#aebbb2 !important; background-color:#26352c !important; }
+.app-shell[data-theme="dark"] :is(.market-refresh,.portfolio-refresh,.income-record-button,.auto-pause-button,.calendar-remove) { color:#d5e3d8; background:#26362c; border-color:#455b4d; }
+.app-shell[data-theme="dark"] :is(.market-watch-card,.market-detail-grid>div,.intraday-price-card,.live-price-chart,.page-persona-tag) { background:#202d26; color:#edf4ef; border-color:#3b5144; }
+.app-shell[data-theme="dark"] .market-watch-card>span,
+.app-shell[data-theme="dark"] .market-detail-grid span,
+.app-shell[data-theme="dark"] .live-chart-heading,
+.app-shell[data-theme="dark"] .live-chart-range { color:#b5c2b8; }
+.app-shell[data-theme="dark"] :is(.portfolio-positive,.market-up) { color:#8cdda1; }
+.app-shell[data-theme="dark"] :is(.portfolio-negative,.market-down) { color:#ff9e8c; }
+.app-shell[data-theme="dark"] .debt-input input { background:transparent !important; }
+.app-shell[data-theme="dark"] :is(input,select,textarea,button):focus-visible { outline-color:#a1ddb2; }
+.app-shell[data-theme="dark"] :is(.calendar-entry-date,.calendar-entry-name b,.debt-row-name,.debt-row-name b,.debt-payoff,.extra-payment small,.impact-message,.forecast-tag,.chart-labels,.axis-label,.result-head,.copilot-avatar,.automation-pool,.auto-invest-context,.portfolio-table-head,.portfolio-row,.page-title-row .eyebrow) { color:#d1ddd4; }
+.app-shell[data-theme="dark"] :is(.calendar-count,.debt-sample-label,.market-connection-pill,.sim-only,.ai-mode,.portfolio-paper-pill) { color:#d3dfd6; background:#2a3b30; border-color:#465b4c; }
+.app-shell[data-theme="dark"] :is(.portfolio-message.error,.market-error,.market-verdict.blocked,.market-rails-off,.debt-interest-note.invalid) { background:#3a2926; border-color:#68433d; color:#ffd0c7; }
+.app-shell[data-theme="dark"] :is(.portfolio-message.success,.market-ai-review.local,.agent-verdict.pass) { background:#243a2c; border-color:#3d6248; color:#d7f0dc; }
+.app-shell[data-theme="dark"] :is(.portfolio-message.error,.market-error,.market-verdict.blocked,.market-rails-off,.debt-interest-note.invalid) :is(b,small,span) { color:#ffd0c7; }
+.app-shell[data-theme="dark"] .account-setup { background:#202d26; border-color:#455b4d; }
+.app-shell[data-theme="dark"] .account-setup :is(h1,.setup-brand,.setup-audience b,.setup-empty-account b) { color:#edf4ef; }
+.app-shell[data-theme="dark"] .account-setup :is(.setup-lede,.setup-audience small,.setup-privacy,.setup-understanding,.setup-name-field>span) { color:#b5c2b8; }
+.app-shell[data-theme="dark"] .setup-audience { background:#19251e; border-color:#455b4d; color:#edf4ef; }
+.app-shell[data-theme="dark"] .setup-audience.selected { background:#243a2c; border-color:#6aa17b; }
+.app-shell[data-theme="dark"] .setup-empty-account { background:#26372d; border-color:#455b4d; }
