@@ -176,9 +176,11 @@ function PaperTradeAgent({ plan, asset, cadence, rails, forecast, safeSurplus, r
 }
 
 function App() {
-  const [accountProfile, setAccountProfile] = useState(readAccountProfile);
+  const [accountProfile, setAccountProfile] = useState(() => readAccountProfile() || {
+    id: 'velora-practice-default', persona: 'Adult', firstName: '', createdAt: new Date().toISOString(), isPractice: true,
+  });
   const persona = accountProfile?.persona || 'Adult';
-  const [activePage, setActivePage] = useState('Overview');
+  const [activePage, setActivePage] = useState('Trading');
   const [darkMode, setDarkMode] = useState(() => window.localStorage.getItem('velora-theme') === 'dark');
   const [paperCash, setPaperCash] = useState(() => {
     try { return Number(JSON.parse(window.localStorage.getItem('velora-paper-portfolio') || '{}').cash) || 0; }
@@ -384,12 +386,9 @@ function App() {
   }
 
   const pages = [
-    { label: 'Overview', icon: LayoutDashboard },
     { label: 'Trading', icon: Activity },
-    { label: 'Markets', icon: CandlestickChart },
-    { label: 'Portfolio', icon: BriefcaseBusiness },
+    { label: 'Overview', icon: LayoutDashboard },
     { label: 'Planning', icon: CalendarDays },
-    { label: 'Tools', icon: SlidersHorizontal },
   ];
 
   return <div className={`app-shell ${persona === 'Kid' ? 'kid-theme' : 'professional-theme'}`} data-theme={darkMode ? 'dark' : 'light'}>
@@ -402,10 +401,10 @@ function App() {
     </aside>
     <div className="workspace">
     <header className="topbar">
-      <div className="top-actions"><span className="status"><i/> {linkedAccount ? 'Sandbox bank linked' : 'No bank linked'}</span><span className="engine"><Sparkles size={13}/> Gemini {aiStatus === 'live' ? 'connected' : 'optional'}</span><button className="new-account-button" onClick={createNewAccount}>New account</button><button className="icon-btn" aria-label="Notifications"><Bell size={18}/></button><button className="avatar" aria-label="Account profile">{(accountProfile?.firstName || persona).slice(0, 1).toUpperCase()}</button></div>
+      <div className="top-actions"><span className="status"><i/> Practice account</span><span className="engine"><Sparkles size={13}/> Gemini {aiStatus === 'live' ? 'connected' : 'optional'}</span><button className="new-account-button" onClick={createNewAccount}>New account</button><button className="icon-btn" aria-label="Notifications"><Bell size={18}/></button><button className="avatar" aria-label="Account profile">{(accountProfile?.firstName || persona).slice(0, 1).toUpperCase()}</button></div>
     </header>
     <main id="top" className="dashboard">
-      <div className="page-title-row"><div><div className="eyebrow">{activePage.toUpperCase()}</div><h1>{activePage === 'Overview' ? (accountProfile?.firstName ? `Welcome, ${accountProfile.firstName}` : displayName) : activePage === 'Markets' && persona === 'Kid' ? 'Stock shop' : activePage}</h1><p>{activePage === 'Overview' ? personaCopy : activePage === 'Trading' ? 'A visible, accelerated replay with fictional bank cash and paper-only orders.' : activePage === 'Markets' ? (persona === 'Kid' ? 'See what company prices are doing. Practice with pretend money.' : 'Explore intraday prices and historical market moves.') : activePage === 'Portfolio' ? 'Your pretend cash, investments, and practice orders.' : activePage === 'Planning' ? 'Plan upcoming money in and money out.' : 'Extra ways to explore your plan.'}</p></div><span className="page-persona-tag">{persona} account · Paper mode</span></div>
+      <div className="page-title-row"><div><div className="eyebrow">{activePage.toUpperCase()}</div><h1>{activePage === 'Overview' ? (accountProfile?.firstName ? `Welcome, ${accountProfile.firstName}` : displayName) : activePage === 'Markets' && persona === 'Kid' ? 'Stock shop' : activePage}</h1><p>{activePage === 'Overview' ? personaCopy : activePage === 'Trading' ? 'Set your practice budget and risk level. See each automatic buy, sell, or wait decision.' : activePage === 'Markets' ? (persona === 'Kid' ? 'See what company prices are doing. Practice with pretend money.' : 'Explore intraday prices and historical market moves.') : activePage === 'Portfolio' ? 'Your pretend cash, investments, and practice orders.' : activePage === 'Planning' ? 'Plan upcoming money in and money out.' : 'Extra ways to explore your plan.'}</p></div><span className="page-persona-tag">{persona} account · Paper mode</span></div>
       {activePage === 'Trading' && <TradingDesk autoStart/>}
       {activePage === 'Overview' && <>
       <section className="summary-grid" aria-label={`${persona} account overview`}>
@@ -431,11 +430,11 @@ function App() {
       <section className="panel decision-panel"><div className="section-title"><div className="section-icon coral-icon"><Wallet size={18}/></div><div><div className="eyebrow">WHAT-IF PLANNER</div><h2>Try a decision first.</h2></div></div><p className="section-description">See what a purchase could change across your whole month.</p><form className="purchase-input" onSubmit={event => {event.preventDefault();setPurchase(Number(purchaseInput.replace(/[^0-9.]/g,''))||0)}}><span>$</span><input value={purchaseInput} onChange={event => setPurchaseInput(event.target.value)} placeholder="1,200 laptop" aria-label="Purchase amount"/><button type="submit">Preview <span>→</span></button></form><div className="quick-picks"><span>Try</span><button onClick={() => {setPurchaseInput('250');setPurchase(250)}}>$250 weekend trip</button><button onClick={() => {setPurchaseInput('1,200');setPurchase(1200)}}>$1,200 laptop</button>{purchase>0&&<button onClick={() => {setPurchase(0);setPurchaseInput('')}}>Clear</button>}</div><div className="impact-box"><div className="impact-heading"><span className="impact-dot"/> LIVE SCENARIO</div><div className="impact-row"><span>Purchase impact</span><b>−{money(purchase)}</b></div><div className="impact-row"><span>Projected lowest balance</span><b className={lowestBalance<reserve?'coral-text':''}>{money(lowestBalance)}</b></div><div className="impact-message"><ShieldCheck size={14}/>{lowestBalance>=reserve?`Your ${money(reserve)} reserve remains protected.`:'This scenario dips into the protected reserve.'}</div></div><div className="ai-footnote"><Activity size={13}/> Forecast recalculates instantly · sample data only</div></section>
       <section className="panel subscriptions-panel"><div className="section-title"><div className="section-icon coral-icon"><CreditCard size={18}/></div><div><div className="eyebrow">RECURRING EXPENSES</div><h2>Your recurring charges.</h2></div></div>{recurringTotal > 0 ? <><div className="subscription-total"><span>Monthly total</span><b>{money(recurringTotal,2)}<small>/mo</small></b></div><div className="subscription-list">{subscriptions.map(item => {const isCancelled=cancelled.includes(item.name);return <div className={isCancelled?'subscription canceled':'subscription'} key={item.name}><div className="service-icon" style={{'--service':item.color}}>{item.icon}</div><div className="service-name"><b>{item.name}</b><small>{isCancelled?'Cancellation simulated':item.detail}</small></div><div className="service-cost">{money(item.amount,2)}<small>/mo</small></div><button className={isCancelled?'toggle on':'toggle'} onClick={() => setCancelled(isCancelled ? cancelled.filter(name => name !== item.name) : [...cancelled, item.name])} aria-label={`${isCancelled?'Restore':'Simulate cancellation'} ${item.name}`}><i/></button></div>})}</div></> : <div className="subscriptions-empty"><CreditCard size={18}/><span><b>No recurring charges added</b><small>Your account is empty by design. Add expected bills to the payment calendar when you’re ready.</small></span></div>}<div className="nudge"><div className="nudge-spark"><Sparkles size={15}/></div><div><span className="nudge-label">PLAN INSIGHT</span><p>{recurringTotal ? 'Recurring charges are planning examples; changing a toggle never modifies a service account.' : 'Once you add recurring items, the forecast and cash-reserve checks will update automatically.'}</p></div></div></section>
       </div>}
-      <footer className="page-footer"><span><LockKeyhole size={13}/> New account · $0 opening balance · no invented transactions</span><span>Paper trades only · browser-local account</span><span className="footer-right">Built for clearer decisions</span></footer>
+      <footer className="page-footer"><span><LockKeyhole size={13}/> Sample practice balance · no linked bank by default</span><span>Simulated trades · browser-local practice account</span><span className="footer-right">Built for clearer decisions</span></footer>
     </main>
     <div className="disclaimer"><span><ShieldCheck size={15}/> <b>Paper investing only.</b> This educational simulation cannot place real trades, move money, or provide formal financial advice.</span></div>
     </div>
-    {!accountProfile && <AccountSetup onCreate={createAccount}/>}
+    {!accountProfile?.createdAt && <AccountSetup onCreate={createAccount}/>}
   </div>;
 }
 
