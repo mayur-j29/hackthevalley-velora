@@ -25,7 +25,7 @@ Import the GitHub repository into Vercel using the Vite preset. Use `npm run bui
 
 ## Optional Gemini Copilot
 
-The app includes a server-side Vercel function at `api/copilot.js`. To enable live Gemini explanations, deploy the Vite project to Vercel and add `GEMINI_API_KEY` as a server environment variable. Never put this key in a `VITE_` variable or browser code. Without the key or serverless runtime, the interface clearly stays in demo-insight mode and uses a local sample-data explanation.
+The app includes server-side Vercel functions at `api/copilot.js` and `api/trading-ai.js`. Add `GEMINI_API_KEY` as a server environment variable to enable AI explanations and candlestick reviews. `GEMINI_MODEL` defaults to `gemini-3.8-flash`. Never put these values in a `VITE_` variable or browser code. Without the key or serverless runtime, the interface uses deterministic fallback rules.
 
 The trading endpoint sends Gemini at most 10 symbols and 20 recent candles per symbol. Gemini returns a suggested action plus a short explanation. The app checks those suggestions locally against candlestick bias, available cash, position caps, and stop thresholds before recording paper fills. Gemini cannot bypass these deterministic checks. Keep the API key server-side.
 

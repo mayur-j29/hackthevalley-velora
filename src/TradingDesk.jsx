@@ -79,6 +79,7 @@ export default function TradingDesk({ autoStart = true }) {
   const budgetRef = useRef(budget);
   const watchlistRef = useRef(watchlist);
   const busyRef = useRef(false);
+  const scanAttemptedRef = useRef(false);
   const processedBarsRef = useRef({});
   const risk = useMemo(() => getVolatilityProfile(volatility), [volatility]);
   const prices = useMemo(() => Object.fromEntries(watchlist.map(symbol => [symbol, Number(markets[symbol]?.points?.at(-1)?.close) || 0])), [markets, watchlist]);
@@ -103,9 +104,9 @@ export default function TradingDesk({ autoStart = true }) {
   useEffect(() => {
     let active = true;
     fetch('/api/copilot').then(response => response.json()).then(data => {
-      if (active && !accountRef.current.decisions?.length) setAiStatus(data.enabled ? 'Gemini key found · awaiting scan' : 'Rules mode · Gemini key missing');
+      if (active && !scanAttemptedRef.current) setAiStatus(data.enabled ? 'Gemini key found · awaiting scan' : 'Rules mode · Gemini key missing');
     }).catch(() => {
-      if (active && !accountRef.current.decisions?.length) setAiStatus('Rules mode · AI status unavailable');
+      if (active && !scanAttemptedRef.current) setAiStatus('Rules mode · AI status unavailable');
     });
     return () => { active = false; };
   }, []);
@@ -182,9 +183,11 @@ export default function TradingDesk({ autoStart = true }) {
           const aiPayload = await aiResponse.json();
           if (!aiResponse.ok || !Array.isArray(aiPayload.decisions)) throw new Error(aiPayload.error || 'AI scan unavailable');
           aiDecisions = Object.fromEntries(aiPayload.decisions.map(item => [item.symbol, item]));
-          setAiStatus('Gemini candle review');
+          scanAttemptedRef.current = true;
+          setAiStatus(`Gemini reviewed ${aiPayload.decisions.length} stocks`);
         } catch (aiError) {
           if (signal?.aborted) throw aiError;
+          scanAttemptedRef.current = true;
           setAiStatus(`Rules fallback · ${aiError.message || 'Gemini unavailable'}`);
         }
       }
