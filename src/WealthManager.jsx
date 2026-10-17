@@ -27,9 +27,9 @@ function readLocalUserProfile() {
 }
 
 const ACCOUNT_TYPES = [
-  { id: 'kids', title: 'Kids', description: 'A guardian-managed space to learn healthy money habits.', detail: 'Learning first · steady growth', risk: 'conservative', persona: 'elena', Icon: Baby },
-  { id: 'student', title: 'Student', description: 'Build confidence with a small, long-term practice portfolio.', detail: 'Start small · growth focused', risk: 'aggressive', persona: 'aisha', Icon: GraduationCap },
-  { id: 'adult', title: 'Adult', description: 'Balance everyday goals with a thoughtful investing plan.', detail: 'Flexible goals · balanced plan', risk: 'balanced', persona: 'marcus', Icon: BriefcaseBusiness },
+  { id: 'kids', title: 'Kids account', description: 'A guardian-managed space to learn healthy money habits.', detail: 'Learning first · steady growth', risk: 'conservative', persona: 'elena', Icon: Baby },
+  { id: 'student', title: 'Student account', description: 'Build confidence with a small, long-term practice portfolio.', detail: 'Start small · growth focused', risk: 'aggressive', persona: 'aisha', Icon: GraduationCap },
+  { id: 'adult', title: 'Adult account', description: 'Balance everyday goals with a thoughtful investing plan.', detail: 'Flexible goals · balanced plan', risk: 'balanced', persona: 'marcus', Icon: BriefcaseBusiness },
 ];
 
 function LineChart({ rows, selected }) {
@@ -67,6 +67,7 @@ export default function WealthManager() {
   const [profileDraft, setProfileDraft] = useState({ name: '', age: '', occupation: '', risk: 'balanced', goal: 'Build long-term wealth', horizonYears: 20 });
   const [profileBusy, setProfileBusy] = useState(false);
   const [landingComplete, setLandingComplete] = useState(false);
+  const [setupStarted, setSetupStarted] = useState(false);
   const [selectedAccountType, setSelectedAccountType] = useState(() => readLocalUserProfile()?.accountType || 'adult');
   const [syncError, setSyncError] = useState('');
   const sessionRef = useRef(null);
@@ -193,13 +194,14 @@ export default function WealthManager() {
     }
     const nextProfile = { ...profileDraft, name, age, horizonYears, accountType: selectedAccountType || profileDraft.accountType || 'adult', occupation: profileDraft.occupation.trim().slice(0, 48), goal: profileDraft.goal.trim().slice(0, 120) || 'Build long-term wealth' };
     setProfileBusy(true); setAuthError('');
-    const preferredAccount = nextProfile.risk === 'aggressive' ? 'aisha' : nextProfile.risk === 'conservative' ? 'elena' : 'marcus';
+    const preferredAccount = ACCOUNT_TYPES.find(type => type.id === nextProfile.accountType)?.persona || (nextProfile.risk === 'aggressive' ? 'aisha' : nextProfile.risk === 'conservative' ? 'elena' : 'marcus');
     if (!supabaseConfigured) {
       try {
         window.localStorage.setItem('velora-wealth-user-profile', JSON.stringify(nextProfile));
         setUserProfile(nextProfile);
         setAccountId(preferredAccount);
         window.localStorage.setItem('velora-simulation-active-account', preferredAccount);
+        setSetupStarted(false);
       } catch { setAuthError('Could not save your profile in this browser. Check storage settings and try again.'); }
       setProfileBusy(false);
       return;
@@ -213,6 +215,7 @@ export default function WealthManager() {
       setAccountId(preferredAccount);
       window.localStorage.setItem(`velora-simulation-active-account-${session.user.id}`, preferredAccount);
       setAuthStatus('ready');
+      setSetupStarted(false);
     }
     setProfileBusy(false);
   }
@@ -221,19 +224,8 @@ export default function WealthManager() {
     const choice = ACCOUNT_TYPES.find(type => type.id === selectedAccountType) || ACCOUNT_TYPES[2];
     setSelectedAccountType(choice.id);
     const defaultOccupation = choice.id === 'student' ? 'Student' : choice.id === 'kids' ? 'Parent / guardian' : 'Working professional';
-    setProfileDraft(current => ({ ...current, accountType: choice.id, risk: choice.risk, occupation: defaultOccupation }));
-    if (userProfile) {
-      const updatedProfile = { ...userProfile, accountType: choice.id };
-      setUserProfile(updatedProfile);
-      setPersona(choice.persona);
-      if (!supabaseConfigured) {
-        try { window.localStorage.setItem('velora-wealth-user-profile', JSON.stringify(updatedProfile)); } catch { /* The current selection still applies for this visit. */ }
-      } else if (session?.user?.id) {
-        void supabase.from('velora_simulations').upsert({ user_id: session.user.id, state: simulation.exportState(), profile: updatedProfile, updated_at: new Date().toISOString() }, { onConflict: 'user_id' }).then(({ error }) => {
-          if (error) setSyncError('Your account type could not be saved. Please reconnect and try again.');
-        });
-      }
-    }
+    setProfileDraft(current => ({ ...current, ...(userProfile || {}), accountType: choice.id, risk: choice.risk, occupation: defaultOccupation }));
+    setSetupStarted(true);
     setLandingComplete(true);
   }
   const portfolio = simulation.getPortfolio(accountId);
@@ -459,9 +451,9 @@ export default function WealthManager() {
   if (!landingComplete) return <main className="wm-landing">
     <div className="wm-landing-glow wm-landing-glow-one"/><div className="wm-landing-glow wm-landing-glow-two"/>
     <header className="wm-landing-header"><div className="wm-brand-lockup"><span className="wm-brand-icon"><span/><span/><span/></span><div><b>velora</b><small>SIMULATED WEALTH</small></div></div><span className="wm-landing-safe"><ShieldCheck size={14}/> Private, simulated, and yours</span></header>
-    <section className="wm-landing-hero"><span className="wm-eyebrow">A CALMER WAY TO BUILD MONEY CONFIDENCE</span><h1>Your next chapter<br/><em>starts here.</em></h1><p>Choose the space that fits you. Velora helps you learn, plan, and grow with a fully simulated portfolio.</p></section>
+    <section className="wm-landing-hero"><span className="wm-eyebrow">A CALMER WAY TO BUILD MONEY CONFIDENCE</span><h1>Open your Velora<br/><em>account.</em></h1><p>Choose the account that fits you, then set up your profile and simulated wealth plan.</p></section>
     <section className="wm-account-options" aria-label="Choose an account type">{ACCOUNT_TYPES.map(({ id, title, description, detail, Icon }) => <button type="button" key={id} className={`wm-account-option${selectedAccountType === id ? ' selected' : ''}`} onClick={() => setSelectedAccountType(id)} aria-pressed={selectedAccountType === id}><span className="wm-account-icon"><Icon size={21}/></span><span className="wm-account-title">{title}</span><span className="wm-account-description">{description}</span><span className="wm-account-detail">{detail}</span><span className="wm-account-radio"/></button>)}</section>
-    <div className="wm-landing-actions"><button className="wm-primary-button" onClick={continueFromLanding}>Continue <span aria-hidden="true">→</span></button><span>No real money. No brokerage connection.</span></div>
+    <div className="wm-landing-actions"><button className="wm-primary-button" onClick={continueFromLanding}>Set up this account <span aria-hidden="true">→</span></button><span>No real money. No brokerage connection.</span></div>
     <footer className="wm-landing-footer">SIMULATED ENVIRONMENT <span/> NOT FINANCIAL ADVICE</footer>
   </main>;
   if (supabaseConfigured && authStatus !== 'ready') return <section className="wm-auth-card">
@@ -477,14 +469,14 @@ export default function WealthManager() {
     {authError && <div className="wm-auth-error" role="alert">{authError}</div>}
     {authMessage && <div className="wm-auth-message" role="status">{authMessage}</div>}
     <button className="wm-auth-switch" onClick={() => { setAuthMode(authMode === 'signup' ? 'signin' : 'signup'); setAuthError(''); setAuthMessage(''); }}>{authMode === 'signup' ? 'Already have an account? Sign in' : 'New to Velora? Create an account'}</button>
-    <button className="wm-auth-switch" onClick={() => setLandingComplete(false)}>← Choose a different account type</button>
+    <button className="wm-auth-switch" onClick={() => { setSetupStarted(false); setLandingComplete(false); }}>← Choose a different account type</button>
     {authStatus === 'error' && <button className="wm-auth-switch" onClick={async () => { await supabase.auth.signOut(); setAuthStatus('signedout'); setAuthError(''); }}>Sign out and try again</button>}
     <small>Simulated environment only. No real money or brokerage account is connected.</small>
   </section>;
-  if ((!supabaseConfigured || authStatus === 'ready') && !userProfile) return <section className="wm-auth-card wm-profile-card">
+  if (setupStarted && (!supabaseConfigured || authStatus === 'ready')) return <section className="wm-auth-card wm-profile-card">
     <div className="wm-brand-lockup"><span className="wm-brand-icon"><span/><span/><span/></span><div><b>velora</b><small>SIMULATED WEALTH</small></div></div>
     <span className="wm-eyebrow">{ACCOUNT_TYPES.find(type => type.id === selectedAccountType)?.title || 'YOUR'} STARTING PROFILE</span>
-    <h1>Let’s make it yours.</h1>
+    <h1>Set up your account</h1>
     <p>{selectedAccountType === 'kids' ? 'A parent or guardian sets up this learning space. Enter the adult account holder’s details.' : 'Tell Velora how to personalize your simulated workspace.'} These details stay {supabaseConfigured ? 'in your private account' : 'in this browser'} and do not connect to any real financial account.</p>
     <form onSubmit={saveUserProfile} className="wm-auth-form wm-profile-form">
       <label>Your name<input autoComplete="name" required maxLength="48" value={profileDraft.name} onChange={event => setProfileDraft(current => ({ ...current, name: event.target.value }))} placeholder="Name to show in Velora"/></label>
@@ -495,7 +487,7 @@ export default function WealthManager() {
       {authError && <div className="wm-auth-error" role="alert">{authError}</div>}
       <button className="wm-primary-button" disabled={profileBusy}>{profileBusy ? 'Saving…' : 'Create my workspace'}</button>
     </form>
-    <button className="wm-auth-switch" onClick={() => setLandingComplete(false)}>← Choose a different account type</button>
+    <button className="wm-auth-switch" onClick={() => { setSetupStarted(false); setLandingComplete(false); }}>← Choose a different account type</button>
     {supabaseConfigured && <button className="wm-auth-switch" onClick={signOut}>Sign out</button>}
     <small>Simulated environment only. The selected risk level chooses a starting paper portfolio.{supabaseConfigured ? '' : ' Add Supabase settings to sync across devices.'}</small>
   </section>;
