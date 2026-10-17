@@ -5,7 +5,7 @@ import { buildForecast, crashScenarios, evaluateSimulatedTrade, getSafeSurplus, 
 import MarketReplay from './MarketReplay';
 import PaperPortfolio from './PaperPortfolio';
 import TradingDesk from './TradingDesk';
-import { readPaperAccount, subscribePaperAccount } from './paperAccount';
+import { createInitialPaperAccount, readPaperAccount, savePaperAccount, subscribePaperAccount } from './paperAccount';
 import { CashCalendar, DebtPlanner, sampleDebtPayments } from './PlanningTools';
 import './styles.css';
 import './planning.css';
@@ -331,9 +331,11 @@ function App() {
     window.localStorage.setItem('velora-custom-events', '[]');
     window.localStorage.setItem('velora-debt-payments', JSON.stringify({ card: 0, student: 0, mortgage: 0 }));
     window.localStorage.removeItem('velora-auto-invest');
+    const initialPaperAccount = createInitialPaperAccount();
+    savePaperAccount(initialPaperAccount);
+    setPaperAccount(initialPaperAccount);
     window.localStorage.removeItem('velora-onboarding-choice');
     setAccountProfile(profile);
-    setPaperCash(0);
     setPurchase(0);
     setPurchaseInput('');
     setCancelled([]);
@@ -359,8 +361,10 @@ function App() {
   function createNewAccount() {
     if (!window.confirm('Create a new account? This permanently replaces this browser’s local profile, paper holdings, order history, and plan settings.')) return;
     for (const key of ['velora-account-profile', 'velora-paper-portfolio', 'velora-custom-events', 'velora-debt-payments', 'velora-auto-invest', 'velora-session-ended']) window.localStorage.removeItem(key);
+    const initialPaperAccount = createInitialPaperAccount();
+    savePaperAccount(initialPaperAccount);
+    setPaperAccount(initialPaperAccount);
     setAccountProfile(null);
-    setPaperCash(0);
     setPurchase(0);
     setPurchaseInput('');
     setCancelled([]);
@@ -502,7 +506,7 @@ function App() {
     <main id="top" className="dashboard">
       <div className="page-title-row"><div><div className="eyebrow">{activePage === 'Trading' ? 'YOUR AI INVESTING ASSISTANT' : activePage.toUpperCase()}</div><h1>{activePage === 'Overview' ? (accountProfile?.firstName ? `Welcome, ${accountProfile.firstName}` : displayName) : activePage === 'Trading' ? 'AI stock trading, made simple' : activePage}</h1><p>{activePage === 'Overview' ? personaCopy : activePage === 'Trading' ? 'A sample account is ready. Choose a budget and risk level; AI explains each idea, while safety rules check every practice order.' : activePage === 'Portfolio' ? 'Your practice cash, stocks, and recent decisions.' : activePage}</p></div><span className="page-persona-tag">{linkedAccount ? 'Plaid Sandbox' : 'Demo account'} · {persona}</span></div>
       <div className="page-content">
-      <div style={{ display: activePage === 'Trading' ? 'block' : 'none' }} aria-hidden={activePage !== 'Trading'}><TradingDesk autoStart={Boolean(accountProfile)} onAiStatus={setAiStatus}/></div>
+      <div style={{ display: activePage === 'Trading' ? 'block' : 'none' }} aria-hidden={activePage !== 'Trading'}><TradingDesk key={accountProfile?.id || 'no-account'} autoStart={Boolean(accountProfile)} onAiStatus={setAiStatus}/></div>
       {activePage === 'Overview' && <>
       <section className="summary-grid" aria-label={`${persona} account overview`}>
         <article className="summary-card balance-card"><div className="card-topline"><span>{persona === 'Kid' ? 'Pretend cash' : linkedAccount ? 'Sandbox bank balance' : 'Demo bank cash'}</span><CircleHelp size={15}/></div><div className="balance-amount">{money(accountBalance-purchase,2)}</div><div className="balance-foot"><span className="up-label"><TrendingUp size={14}/> {linkedAccount ? 'Plaid Sandbox' : 'Velora Demo Bank'}</span><span>{linkedAccount ? `${linkedAccount.currency} · •••• ${linkedAccount.mask}` : `CAD · •••• ${DEMO_BANK.mask}`}</span></div><div className="balance-spark"><svg viewBox="0 0 140 42"><path d="M1 32 C18 26 18 33 33 25 S55 28 65 17 S84 23 98 12 S116 19 139 3" fill="none" stroke="#70b69a" strokeWidth="2"/></svg></div></article>
