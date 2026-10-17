@@ -135,6 +135,19 @@ export function executePaperOrder({ portfolio, symbol, side, shares, price, safe
   };
 }
 
+export function getVolatilityProfile(value) {
+  const tolerance = Math.max(0, Math.min(100, Number(value) || 0));
+  const scale = tolerance / 100;
+  return {
+    tolerance,
+    maxPositionPct: 0.08 + scale * 0.22,
+    stopLossPct: 0.015 + scale * 0.045,
+    fastWindow: Math.round(4 - scale),
+    slowWindow: Math.round(8 - scale * 3),
+    label: tolerance < 34 ? 'Lower' : tolerance < 68 ? 'Balanced' : 'Higher',
+  };
+}
+
 export function evaluateMovingAverageCrossover(prices, index, hasPosition, fastWindow = 3, slowWindow = 5) {
   if (!Array.isArray(prices) || !Number.isInteger(index) || index < slowWindow || fastWindow < 1 || slowWindow <= fastWindow) return 'hold';
   const valid = prices.slice(0, index + 1).map(Number);

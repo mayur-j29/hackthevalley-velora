@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildForecast, calculateDebtPayoff, evaluateMovingAverageCrossover, evaluateSimulatedTrade, executePaperOrder, getSafeSurplus, simulateAutoInvest, simulateHistoricalInvestment, startingBalance } from './finance.js';
+import { buildForecast, calculateDebtPayoff, evaluateMovingAverageCrossover, evaluateSimulatedTrade, executePaperOrder, getSafeSurplus, getVolatilityProfile, simulateAutoInvest, simulateHistoricalInvestment, startingBalance } from './finance.js';
 
 test('forecast includes all scheduled cash events and preserves its start balance', () => {
   const sampleEvents = [{ day: 8, title: 'Payday', amount: 2450, kind: 'income' }, { day: 26, title: 'Rent', amount: -1850, kind: 'bill' }];
@@ -103,6 +103,20 @@ test('moving-average paper strategy emits only deterministic crossover observati
   assert.equal(evaluateMovingAverageCrossover([1, 2, 3, 4, 5, 6], 5, false), 'buy');
   assert.equal(evaluateMovingAverageCrossover([1, 2, 3, 4], 3, false), 'hold');
   assert.equal(evaluateMovingAverageCrossover([1, 2, Number.NaN, 4, 5, 6], 5, false), 'hold');
+});
+
+test('volatility preference changes only bounded paper risk parameters', () => {
+  const low = getVolatilityProfile(0);
+  const middle = getVolatilityProfile(50);
+  const high = getVolatilityProfile(100);
+  assert.equal(low.maxPositionPct, 0.08);
+  assert.equal(high.maxPositionPct, 0.3);
+  assert.ok(low.stopLossPct < middle.stopLossPct);
+  assert.ok(middle.stopLossPct < high.stopLossPct);
+  assert.equal(low.label, 'Lower');
+  assert.equal(high.label, 'Higher');
+  assert.equal(getVolatilityProfile(200).tolerance, 100);
+  assert.equal(getVolatilityProfile(-5).tolerance, 0);
 });
 
 test('a fresh profile starts with zero cash and no scheduled transactions', () => {
