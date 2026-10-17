@@ -1,7 +1,7 @@
 const MAX_QUESTION_LENGTH = 280;
 const MAX_ANSWER_LENGTH = 900;
 const REQUEST_TIMEOUT_MS = 11000;
-const DEFAULT_MODEL = 'gemini-2.5-flash';
+const DEFAULT_MODEL = 'gemini-3.8-flash';
 
 export default async function handler(request, response) {
   if (request.method === 'GET') return response.status(200).json({ enabled: Boolean(process.env.GEMINI_API_KEY) });
