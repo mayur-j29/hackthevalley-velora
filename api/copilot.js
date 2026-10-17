@@ -77,13 +77,15 @@ export default async function handler(request, response) {
         generationConfig: { maxOutputTokens: whatIf ? 240 : 180, temperature: 0.35 },
       }),
     });
-    if (!result.ok) return response.status(502).json({ error: 'AI is temporarily unavailable.' });
+    if (!result.ok) { console.error(`[velora-copilot] Gemini request failed with HTTP ${result.status}`); return response.status(502).json({ error: 'AI is temporarily unavailable.', code: result.status }); }
     const payload = await result.json();
     const answer = payload.candidates?.[0]?.content?.parts?.map(part => part.text || '').join('').trim().slice(0, MAX_ANSWER_LENGTH);
     if (!answer) return response.status(502).json({ error: 'AI returned an empty answer.' });
     return response.status(200).json({ answer, model });
-  } catch {
-    return response.status(502).json({ error: 'Could not reach the AI service.' });
+  } catch (error) {
+    const code = error?.name === 'AbortError' ? 'TIMEOUT' : 'NETWORK';
+    console.error(`[velora-copilot] Gemini request failed: ${code}`);
+    return response.status(502).json({ error: 'Could not reach the AI service.', code });
   } finally {
     clearTimeout(timeout);
   }
