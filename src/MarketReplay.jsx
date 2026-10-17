@@ -148,7 +148,7 @@ export default function MarketReplay({ safeSurplus, reserve, rails, persona = 'A
         }),
       });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok || !data.answer) throw new Error('Gemini is unavailable');
+      if (!response.ok || !data.answer) throw new Error('AI is unavailable');
       setReview({ mode: 'live', answer: data.answer });
     } catch {
       if (controller.signal.aborted) return;
@@ -180,8 +180,8 @@ export default function MarketReplay({ safeSurplus, reserve, rails, persona = 'A
       {replay && replay.verdict === 'blocked' && <div className="market-verdict blocked" role="alert"><ShieldCheck size={15}/><span><b>RULES ENGINE · BLOCK</b><small>{replay.reason}</small></span></div>}
       {replay && replay.verdict === 'unavailable' && <div className="market-verdict blocked" role="alert"><AlertTriangle size={15}/><span><b>REPLAY UNAVAILABLE</b><small>{replay.reason}</small></span></div>}
       {replay && replay.verdict === 'pass' && <div className="replay-result" aria-live="polite"><div className="replay-result-head"><div><span>HYPOTHETICAL OUTCOME · {history.period.toUpperCase()} <i className="rules-pass-pill">RULES PASS</i></span><b>{money(replay.endingValue, 2)}</b></div><div className={replay.profitLoss >= 0 ? 'replay-return positive' : 'replay-return negative'}>{replay.profitLoss >= 0 ? <ArrowUpRight size={16}/> : <ArrowDownRight size={16}/>}<b>{replay.profitLoss >= 0 ? '+' : '−'}{money(Math.abs(replay.profitLoss), 2)}</b><small>{replay.returnPct >= 0 ? '+' : ''}{replay.returnPct.toFixed(2)}% total return</small></div></div><HistoryChart result={replay}/><div className="replay-stats"><span>Hypothetical shares<b>{replay.shares.toFixed(4)}</b></span><span>Peak-to-trough drawdown<b className="drawdown">−{replay.maxDrawdownPct.toFixed(2)}%</b></span><span>Period<b>{replay.startDate} — {replay.endDate}</b></span></div><div className="replay-footnote"><Check size={13}/>{replay.reason} Not a forecast: historical performance can differ materially from future results.</div></div>}
-      {reviewing && <div className="market-loading" role="status"><span className="market-loader-orb"><Sparkles size={18}/></span><div><b>Gemini is explaining the replay</b><small>Rules made the decision; AI is reviewing historical context…</small></div><span className="market-loading-bar"/></div>}
-      {review && <div className={`market-ai-review ${review.mode}`}><div><Sparkles size={14}/><b>{review.mode === 'live' ? 'GEMINI REVIEW' : 'LOCAL EXPLANATION'}</b></div><p>{review.answer}</p></div>}
+      {reviewing && <div className="market-loading" role="status"><span className="market-loader-orb"><Sparkles size={18}/></span><div><b>AI is explaining the replay</b><small>Rules made the decision; AI is reviewing historical context…</small></div><span className="market-loading-bar"/></div>}
+      {review && <div className={`market-ai-review ${review.mode}`}><div><Sparkles size={14}/><b>{review.mode === 'live' ? 'AI REVIEW' : 'LOCAL EXPLANATION'}</b></div><p>{review.answer}</p></div>}
     </>}
     <div className="market-boundary"><ShieldCheck size={13}/> Public market quotes may be delayed. Historical replay is informational and cannot predict future prices; all orders are pretend and stay in this browser.</div>
   </section>;

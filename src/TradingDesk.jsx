@@ -39,7 +39,8 @@ function createAccount() {
   try {
     const saved = JSON.parse(window.localStorage.getItem('velora-simple-paper-account') || 'null');
     if (saved?.version === 1 && Number.isFinite(saved.bankCash) && Number.isFinite(saved.cash) && saved.positions && Array.isArray(saved.fills)) {
-      return { decisions: [], realizedPnl: 0, ...saved };
+      const unique = items => [...new Map((items || []).filter(item => item?.id).map(item => [item.id, item])).values()];
+      return { decisions: [], realizedPnl: 0, ...saved, decisions: unique(saved.decisions), fills: unique(saved.fills) };
     }
   } catch { /* Start a fresh practice ledger if saved data is unavailable. */ }
   return { version: 1, bankCash: START_BANK - START_BUDGET, cash: START_BUDGET, positions: {}, fills: [], decisions: [], realizedPnl: 0, budget: START_BUDGET, volatility: 35 };
@@ -65,7 +66,7 @@ export default function TradingDesk({ autoStart = true }) {
   const [directoryPage, setDirectoryPage] = useState(1);
   const [directoryBusy, setDirectoryBusy] = useState(false);
   const [directoryError, setDirectoryError] = useState('');
-  const [aiStatus, setAiStatus] = useState('Checking Gemini');
+  const [aiStatus, setAiStatus] = useState('Checking AI');
   const [volatility, setVolatility] = useState(() => createAccount().volatility ?? 35);
   const [budget, setBudget] = useState(() => createAccount().budget ?? START_BUDGET);
   const [running, setRunning] = useState(autoStart);
@@ -80,7 +81,10 @@ export default function TradingDesk({ autoStart = true }) {
   const watchlistRef = useRef(watchlist);
   const busyRef = useRef(false);
   const scanAttemptedRef = useRef(false);
-  const processedBarsRef = useRef({});
+  const processedBarsRef = useRef(Object.fromEntries([...(account.decisions || []), ...account.fills].reduce((latest, item) => {
+    if (item.symbol && item.time && item.time > (latest[item.symbol] || '')) latest[item.symbol] = item.time;
+    return latest;
+  }, {})));
   const risk = useMemo(() => getVolatilityProfile(volatility), [volatility]);
   const prices = useMemo(() => Object.fromEntries(watchlist.map(symbol => [symbol, Number(markets[symbol]?.points?.at(-1)?.close) || 0])), [markets, watchlist]);
   const analyses = useMemo(() => Object.fromEntries(watchlist.map(symbol => {
@@ -100,11 +104,12 @@ export default function TradingDesk({ autoStart = true }) {
   useEffect(() => { accountRef.current = account; }, [account]);
   useEffect(() => { volatilityRef.current = volatility; }, [volatility]);
   useEffect(() => { budgetRef.current = budget; }, [budget]);
+  useEffect(() => { setRunning(autoStart); }, [autoStart]);
   useEffect(() => { watchlistRef.current = watchlist; try { window.localStorage.setItem('velora-trading-watchlist', JSON.stringify(watchlist)); } catch { /* Watchlist stays active for this session. */ } }, [watchlist]);
   useEffect(() => {
     let active = true;
     fetch('/api/copilot').then(response => response.json()).then(data => {
-      if (active && !scanAttemptedRef.current) setAiStatus(data.enabled ? 'Gemini key found · awaiting scan' : 'Rules mode · Gemini key missing');
+      if (active && !scanAttemptedRef.current) setAiStatus(data.enabled ? 'AI ready · awaiting scan' : 'Rules mode · AI unavailable');
     }).catch(() => {
       if (active && !scanAttemptedRef.current) setAiStatus('Rules mode · AI status unavailable');
     });
@@ -184,11 +189,11 @@ export default function TradingDesk({ autoStart = true }) {
           if (!aiResponse.ok || !Array.isArray(aiPayload.decisions)) throw new Error(aiPayload.error || 'AI scan unavailable');
           aiDecisions = Object.fromEntries(aiPayload.decisions.map(item => [item.symbol, item]));
           scanAttemptedRef.current = true;
-          setAiStatus(`Gemini reviewed ${aiPayload.decisions.length} stocks`);
+          setAiStatus(`AI reviewed ${aiPayload.decisions.length} stocks`);
         } catch (aiError) {
           if (signal?.aborted) throw aiError;
           scanAttemptedRef.current = true;
-          setAiStatus(`Rules fallback · ${aiError.message || 'Gemini unavailable'}`);
+          setAiStatus(`Rules fallback · ${aiError.message || 'AI unavailable'}`);
         }
       }
       for (const candidate of candidates) {
@@ -239,7 +244,7 @@ export default function TradingDesk({ autoStart = true }) {
           newFills.push({ id: `${symbol}-${barTime}-sell`, symbol, side: 'sell', shares: position.shares, price, time: barTime, reason, pnl: tradePnl });
           reason += ` Practice sale: ${money(proceeds)}; result ${tradePnl >= 0 ? '+' : '−'}${money(Math.abs(tradePnl))}.`;
         }
-        newDecisions.push({ id: `${symbol}-${candidate.candles.at(-1).date}`, symbol, action: newFills.at(-1)?.symbol === symbol ? newFills.at(-1).side.toUpperCase() : action, suggestedAction, price, time: candidate.candles.at(-1).date, reason, pattern: pattern.name, bias: pattern.bias, source: suggestion ? 'Gemini' : 'Rules' });
+        newDecisions.push({ id: `${symbol}-${candidate.candles.at(-1).date}`, symbol, action: newFills.at(-1)?.symbol === symbol ? newFills.at(-1).side.toUpperCase() : action, suggestedAction, price, time: candidate.candles.at(-1).date, reason, pattern: pattern.name, bias: pattern.bias, source: suggestion ? 'AI' : 'Rules' });
       }
       if (newFills.length || newDecisions.length) {
         nextAccount.fills = [...newFills, ...nextAccount.fills].slice(0, 60);
@@ -256,10 +261,11 @@ export default function TradingDesk({ autoStart = true }) {
   }
 
   useEffect(() => {
+    if (!autoStart) { setLoading(false); return undefined; }
     const controller = new AbortController();
     scanMarket(controller.signal);
     return () => controller.abort();
-  }, []);
+  }, [autoStart]);
 
   useEffect(() => {
     if (!running) return undefined;
@@ -323,7 +329,7 @@ export default function TradingDesk({ autoStart = true }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          question: `Explain this practice-only stock analysis in plain English: ${latest.action} ${latest.symbol} at ${latest.price}. Reason: ${latest.reason}. The rule-based strategy made the action. Explain what the rule means. Do not recommend a real trade or predict returns.`,
+          question: `Explain this practice-only stock analysis in plain English. The AI suggested ${latest.suggestedAction || latest.action}; after the separate safety checks, the recorded action was ${latest.action} for ${latest.symbol} at ${latest.price}. Reason: ${latest.reason}. Explain the pattern and checks simply. Do not recommend a real trade or predict returns.`,
           persona: 'Adult',
           safeSurplus: account.cash,
           investmentVerdict: latest.action === 'BUY' || latest.action === 'SELL' ? 'pass' : 'block',
@@ -343,7 +349,7 @@ export default function TradingDesk({ autoStart = true }) {
   const freshness = lastChecked ? lastChecked.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' }) : 'Checking prices…';
 
   return <section className="trading-desk panel simple-trading" aria-labelledby="trading-desk-title">
-    <header className="simple-trading-head"><div><div className="simple-kicker"><span className="simple-dot"/> AUTO CHECK · NYSE MINUTE CANDLES · TSX DAILY</div><h2 id="trading-desk-title">Your investing desk</h2><p>Gemini reads each new candle and suggests an action. A separate rules engine checks it before any practice order.</p></div><span className="practice-badge"><Landmark size={14}/> Sample practice account</span></header>
+    <header className="simple-trading-head"><div><div className="simple-kicker"><span className="simple-dot"/> CONTINUOUS SCAN · NYSE MINUTE CANDLES · TSX DAILY</div><h2 id="trading-desk-title">Your investing desk</h2><p>AI reviews each new candle and suggests an action. Safety rules check every order before a practice trade.</p></div><span className="practice-badge"><Landmark size={14}/> Sample practice account</span></header>
 
     <div className="simple-money-cards"><article><span><Landmark size={15}/> Sample account balance</span><b>{money(account.bankCash + account.cash)}</b><small>Preloaded practice balance · not a linked bank</small></article><article><span><Wallet size={15}/> Investing cash</span><b>{money(account.cash)}</b><small>Available to the strategy</small></article><article><span><Activity size={15}/> Stock portfolio</span><b>{money(positionsValue)}</b><small>{holdings.length} stocks · latest available prices</small></article><article><span><TrendingUp size={15}/> Practice result</span><b className={totalPnl >= 0 ? 'desk-positive' : 'desk-negative'}>{totalPnl >= 0 ? '+' : '−'}{money(Math.abs(totalPnl))}</b><small>Changes as practice prices move</small></article></div>
 
@@ -352,7 +358,7 @@ export default function TradingDesk({ autoStart = true }) {
 
     <div className="simple-controls"><div><span className={running ? 'simple-dot' : 'simple-dot paused'}/><b>{running ? 'Automatic practice trading on' : 'Automatic practice trading paused'}</b><small>{loading ? 'Checking prices…' : `Last check: ${freshness}`}</small></div><button type="button" onClick={() => setRunning(value => !value)}>{running ? <><Pause size={15}/> Pause</> : <><Play size={15}/> Start automatic trading</>}</button><button type="button" className="simple-reset" onClick={resetPractice}><RotateCcw size={14}/> Reset practice account</button></div>
 
-    <div className="simple-how-it-works" aria-label="How the automated scan works"><article><span>01</span><div><b>Read the candles</b><small>Checks your {watchlist.length} selected stocks once a minute. TSX gets daily candles.</small></div></article><article><span>02</span><div><b>Gemini explains the pattern</b><small>Reviews candle shape and trend, then suggests buy, sell, or wait.</small></div></article><article><span>03</span><div><b>Rules check the order</b><small>Cash, position limits, candle bias, and exit rules are checked independently.</small></div></article></div>
+    <div className="simple-how-it-works" aria-label="How the automated scan works"><article><span>01</span><div><b>Read the candles</b><small>Checks your {watchlist.length} selected stocks once a minute. TSX gets daily candles.</small></div></article><article><span>02</span><div><b>AI explains the pattern</b><small>Reviews candle shape and trend, then suggests buy, sell, or wait.</small></div></article><article><span>03</span><div><b>Rules check the order</b><small>Cash, position limits, candle bias, and exit rules are checked independently.</small></div></article></div>
 
     {error && <div className="simple-error" role="alert">{error}</div>}
     {loading && <div className="simple-loading" role="status"><span/>Checking available price history…</div>}
@@ -363,8 +369,8 @@ export default function TradingDesk({ autoStart = true }) {
     <div className="simple-section-title simple-portfolio-title"><span className="simple-icon"><Wallet size={17}/></span><span><b>Your practice stocks</b><small>Each stock's value updates when new market prices are available.</small></span></div>
     {holdings.length ? <div className="simple-holdings"><div className="simple-holding-header"><span>STOCK</span><span>SHARES</span><span>PRICE</span><span>VALUE</span><span>RESULT</span></div>{holdings.map(holding => <div className="simple-holding" key={holding.symbol}><b>{holding.symbol}</b><span>{holding.shares.toFixed(4)}</span><span>{money(holding.price)}</span><b>{money(holding.marketValue)}</b><strong className={holding.pnl >= 0 ? 'desk-positive' : 'desk-negative'}>{holding.pnl >= 0 ? '+' : '−'}{money(Math.abs(holding.pnl))}</strong></div>)}</div> : <div className="simple-empty">No practice stocks yet. The strategy will add a position only when its buy rule is met.</div>}
 
-    <div className="simple-analysis-heading"><div className="simple-section-title simple-analysis-title"><span className="simple-icon ai"><Sparkles size={17}/></span><span><b>Decision log</b><small>See Gemini’s suggestion, any rule checks, and why the final action was taken.</small></span></div><button type="button" onClick={explainLatestDecision} disabled={!account.decisions?.length || aiBusy}>{aiBusy ? 'Asking Gemini…' : 'Explain latest'}</button></div>
-    {account.decisions?.length ? <div className="simple-decisions">{account.decisions.slice(0, 5).map(item => <article key={item.id}><span className={`simple-action ${item.action.toLowerCase()}`}>{item.action}</span><div><b>{item.symbol} · {money(item.price)}</b><small><strong>{item.source === 'Gemini' ? 'Gemini' : 'Rules'}{item.suggestedAction && item.suggestedAction !== item.action ? ` suggested ${item.suggestedAction} → rules changed it to ${item.action}` : item.suggestedAction ? ` suggested ${item.suggestedAction}` : ' check'}:</strong> {item.reason}</small></div><time>{item.time ? new Date(item.time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'Initial setup'}</time></article>)}</div> : <div className="simple-empty">Waiting for a new price update. The strategy will show whether it buys, sells, or waits and why.</div>}
+    <div className="simple-analysis-heading"><div className="simple-section-title simple-analysis-title"><span className="simple-icon ai"><Sparkles size={17}/></span><span><b>Decision log</b><small>See the AI suggestion, any rule checks, and why the final action was taken.</small></span></div><button type="button" onClick={explainLatestDecision} disabled={!account.decisions?.length || aiBusy}>{aiBusy ? 'Asking AI…' : 'Explain latest'}</button></div>
+    {account.decisions?.length ? <div className="simple-decisions">{account.decisions.slice(0, 5).map(item => <article key={item.id}><span className={`simple-action ${item.action.toLowerCase()}`}>{item.action}</span><div><b>{item.symbol} · {money(item.price)}</b><small><strong>{item.source && item.source !== 'Rules' ? 'AI' : 'Rules'}{item.suggestedAction && item.suggestedAction !== item.action ? ` suggested ${item.suggestedAction} → rules changed it to ${item.action}` : item.suggestedAction ? ` suggested ${item.suggestedAction}` : ' check'}:</strong> {item.reason}</small></div><time>{item.time ? new Date(item.time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'Initial setup'}</time></article>)}</div> : <div className="simple-empty">Waiting for a new price update. The strategy will show whether it buys, sells, or waits and why.</div>}
     {aiExplanation && <div className="simple-ai-explanation"><Sparkles size={15}/><p>{aiExplanation}</p></div>}
 
     {account.fills.length > 0 && <div className="simple-fill-summary"><b>Recent practice orders</b>{account.fills.slice(0, 3).map(fill => <span key={fill.id}><i className={fill.side}/>{fill.side.toUpperCase()} {fill.symbol} · {fill.shares.toFixed(4)} shares at {money(fill.price)}</span>)}</div>}

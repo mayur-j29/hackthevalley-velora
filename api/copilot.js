@@ -6,7 +6,7 @@ const DEFAULT_MODEL = 'gemini-3.8-flash';
 export default async function handler(request, response) {
   if (request.method === 'GET') return response.status(200).json({ enabled: Boolean(process.env.GEMINI_API_KEY) });
   if (request.method !== 'POST') return response.status(405).json({ error: 'Method not allowed' });
-  if (!process.env.GEMINI_API_KEY) return response.status(503).json({ error: 'Gemini is not configured' });
+  if (!process.env.GEMINI_API_KEY) return response.status(503).json({ error: 'AI is not configured' });
 
   const body = request.body && typeof request.body === 'object' ? request.body : {};
   const question = typeof body.question === 'string' ? body.question.trim().slice(0, MAX_QUESTION_LENGTH) : '';
@@ -54,13 +54,13 @@ export default async function handler(request, response) {
         generationConfig: { maxOutputTokens: 180, temperature: 0.35 },
       }),
     });
-    if (!result.ok) return response.status(502).json({ error: 'Gemini is temporarily unavailable.' });
+    if (!result.ok) return response.status(502).json({ error: 'AI is temporarily unavailable.' });
     const payload = await result.json();
     const answer = payload.candidates?.[0]?.content?.parts?.map(part => part.text || '').join('').trim().slice(0, MAX_ANSWER_LENGTH);
-    if (!answer) return response.status(502).json({ error: 'Gemini returned an empty answer.' });
+    if (!answer) return response.status(502).json({ error: 'AI returned an empty answer.' });
     return response.status(200).json({ answer, model });
   } catch {
-    return response.status(502).json({ error: 'Could not reach Gemini.' });
+    return response.status(502).json({ error: 'Could not reach the AI service.' });
   } finally {
     clearTimeout(timeout);
   }

@@ -3,7 +3,7 @@ const MAX_CANDIDATES = 10;
 
 export default async function handler(request, response) {
   if (request.method !== 'POST') return response.status(405).json({ error: 'Method not allowed' });
-  if (!process.env.GEMINI_API_KEY) return response.status(503).json({ error: 'Add GEMINI_API_KEY in Vercel to enable AI trade suggestions.' });
+  if (!process.env.GEMINI_API_KEY) return response.status(503).json({ error: 'AI trade suggestions are not configured.' });
   const body = request.body && typeof request.body === 'object' ? request.body : {};
   const candidates = Array.isArray(body.candidates) ? body.candidates.slice(0, MAX_CANDIDATES).map(candidate => ({
     symbol: typeof candidate.symbol === 'string' ? candidate.symbol.slice(0, 24) : '',
@@ -32,15 +32,15 @@ export default async function handler(request, response) {
       }),
     });
     const payload = await result.json();
-    if (!result.ok) return response.status(502).json({ error: 'Gemini could not analyze the current candles.' });
+    if (!result.ok) return response.status(502).json({ error: 'AI could not analyze the current candles.' });
     const text = payload.candidates?.[0]?.content?.parts?.map(part => part.text || '').join('').trim();
     const parsed = JSON.parse(text || '{}');
     const allowed = new Set(candidates.map(candidate => candidate.symbol));
     const decisions = Array.isArray(parsed.decisions) ? parsed.decisions.filter(item => allowed.has(item.symbol) && ['BUY', 'SELL', 'HOLD'].includes(item.action)).map(item => ({ symbol: item.symbol, action: item.action, reason: String(item.reason || 'No explanation provided.').replace(/[<>]/g, '').slice(0, 180) })) : [];
-    if (decisions.length !== candidates.length) return response.status(502).json({ error: 'Gemini returned incomplete candle analysis.' });
+    if (decisions.length !== candidates.length) return response.status(502).json({ error: 'AI returned an incomplete candle review.' });
     return response.status(200).json({ decisions, model });
   } catch {
-    return response.status(502).json({ error: 'Could not complete the Gemini candle analysis.' });
+    return response.status(502).json({ error: 'Could not complete the AI candle review.' });
   } finally {
     clearTimeout(timeout);
   }

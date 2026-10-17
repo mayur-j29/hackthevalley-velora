@@ -13,9 +13,11 @@ export default async function handler(request, response) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
-    const quotes = process.env.TWELVE_DATA_API_KEY
-      ? await Promise.all(symbols.map(symbol => fetchTwelveData(symbol, process.env.TWELVE_DATA_API_KEY, controller.signal)))
-      : await Promise.all(symbols.map(symbol => fetchYahoo(symbol, controller.signal)));
+    const quotes = await Promise.all(symbols.map(async symbol => {
+      if (!process.env.TWELVE_DATA_API_KEY) return fetchYahoo(symbol, controller.signal);
+      try { return await fetchTwelveData(symbol, process.env.TWELVE_DATA_API_KEY, controller.signal); }
+      catch { return fetchYahoo(symbol, controller.signal); }
+    }));
     const available = quotes.filter(Boolean);
     if (!available.length) return response.status(502).json({ error: 'No candles are available for the selected symbols. Check data access and try again.' });
     return response.status(200).json({ quotes: available, fetchedAt: new Date().toISOString(), source: process.env.TWELVE_DATA_API_KEY ? 'Twelve Data' : 'Yahoo Finance' });
