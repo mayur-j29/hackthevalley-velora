@@ -9,8 +9,8 @@ export default async function handler(request, response) {
   const symbols = [...new Set((params.get('symbols') || 'SPY:NYSE,AAPL:NYSE,MSFT:NYSE,TSLA:NYSE').split(',').map(value => value.trim()).filter(Boolean))];
   const range = params.get('range') || '1d';
   if (!['1d', '5d', '1mo', '6mo', '1y'].includes(range)) return response.status(400).json({ error: 'Choose a supported chart range: 1d, 5d, 1mo, 6mo, or 1y.' });
-  if (!symbols.length || symbols.length > MAX_SYMBOLS || symbols.some(value => !/^[A-Z0-9.-]{1,15}:(NYSE|TSX)$/.test(value))) {
-    return response.status(400).json({ error: `Choose up to ${MAX_SYMBOLS} supported NYSE or TSX ticker symbols.` });
+  if (!symbols.length || symbols.length > MAX_SYMBOLS || symbols.some(value => !/^[A-Z0-9.-]{1,15}:(NYSE|NASDAQ|TSX)$/.test(value))) {
+    return response.status(400).json({ error: `Choose up to ${MAX_SYMBOLS} supported NYSE, Nasdaq, or TSX ticker symbols.` });
   }
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -79,7 +79,7 @@ async function fetchTwelveData(symbol, apiKey, signal, range) {
     open: Number(point.open), high: Number(point.high), low: Number(point.low), close: Number(point.close), volume: Number(point.volume) || 0,
   })).filter(point => [point.open, point.high, point.low, point.close].every(value => Number.isFinite(value) && value > 0)).reverse();
   return {
-    symbol, displayName: payload.meta?.name || ticker, exchange: exchange === 'TSX' ? 'TSX' : 'NYSE', currency: payload.meta?.currency || (exchange === 'TSX' ? 'CAD' : 'USD'), interval, period: range, points,
+    symbol, displayName: payload.meta?.name || ticker, exchange, currency: payload.meta?.currency || (exchange === 'TSX' ? 'CAD' : 'USD'), interval, period: range, points,
     source: `Twelve Data · ${interval} candles`, fetchedAt: new Date().toISOString(),
   };
 }
@@ -109,5 +109,5 @@ async function fetchYahoo(symbol, signal, requestedRange = '1d') {
     if (![open, high, low, close].every(value => Number.isFinite(value) && value > 0)) return [];
     return [{ date: new Date(timestamp * 1000).toISOString(), open, high, low, close, volume: Number(quote.volume?.[index]) || 0 }];
   });
-  return { symbol, displayName: chart.meta?.shortName || chart.meta?.longName || ticker, exchange: exchange === 'TSX' ? 'TSX' : 'NYSE', currency: chart.meta?.currency || (exchange === 'TSX' ? 'CAD' : 'USD'), interval, period: requestedRange, points, source: `Yahoo Finance · ${interval} candles`, fetchedAt: new Date().toISOString() };
+  return { symbol, displayName: chart.meta?.shortName || chart.meta?.longName || ticker, exchange, currency: chart.meta?.currency || (exchange === 'TSX' ? 'CAD' : 'USD'), interval, period: requestedRange, points, source: `Yahoo Finance · ${interval} candles`, fetchedAt: new Date().toISOString() };
 }
