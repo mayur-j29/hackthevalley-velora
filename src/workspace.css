@@ -443,3 +443,38 @@
 .market-selected-history { margin-top:15px; }
 .app-shell[data-theme="dark"] .simple-trading :is(.simple-kicker,.simple-money-cards article>span,.simple-money-cards article>small,.simple-section-title small,.simple-budget>label,.simple-range-labels,.simple-risk-explain,.simple-controls>div small,.simple-watch-grid article>span,.simple-watch-grid article>small,.simple-holding-header,.simple-holding,.simple-empty,.simple-decisions article>div>small,.simple-decisions time,.simple-stock-card-head>span>small,.simple-stock-decision>small,.simple-pattern-explanation,.simple-pattern-bias,.simple-directory-item>span>small,.simple-directory-item>small,.simple-directory-loading) { color:#c2cec5 !important; }
 .app-shell[data-theme="dark"] .simple-trading small { font-size:10px !important; line-height:1.4; }
+
+/* Kid dark mode keeps the playful purple palette while lifting text off dark surfaces. */
+.app-shell.kid-theme[data-theme="dark"] {
+  --shell-ink:#f4edff;
+  --shell-muted:#ded3f3;
+  --shell-line:#5a4c78;
+  --shell-surface:#2d2443;
+  --shell-canvas:#1d1733;
+  --shell-accent:#d0b8ff;
+  --theme-ink:#f4edff;
+  --theme-muted:#ded3f3;
+  --theme-line:#5a4c78;
+  --theme-surface:#2d2443;
+  --theme-inset:#231b38;
+  --theme-accent:#d0b8ff;
+  --theme-accent-strong:#efe5ff;
+  --theme-accent-soft:#403258;
+  --theme-bar:#302547;
+  color:#f4edff;
+  color-scheme:dark;
+}
+.app-shell.kid-theme[data-theme="dark"] .workspace :is(.page-title-row h1,.panel h2,.section-title h2,.market-head h2,.portfolio-head h2,.desk-header h2) { color:#fff1c4 !important; }
+.app-shell.kid-theme[data-theme="dark"] .workspace :is(.page-title-row p,.card-topline,.metric-note,.balance-foot,.metric-foot,.panel-heading p,.section-description,.market-head p,.market-chart-note,.market-data-meta,.market-boundary,.portfolio-head p,.portfolio-summary span,.portfolio-summary small,.portfolio-boundary,.chart-summary span,.chart-legend,.calendar-note,.calendar-entry-name small,.debt-interest-note,.what-if-form label>span,.what-if-stats span,.what-if-stats small,.what-if-note,.what-if-empty,.market-controls label>span,.market-replay-form label>span,.page-persona-tag,.disclaimer) { color:#ded3f3 !important; }
+.app-shell.kid-theme[data-theme="dark"] .workspace :is(.summary-card,.panel,.page-persona-tag,.market-watch-card,.market-detail-grid>div,.market-replay-details,.calendar-add-details,.debt-edit-details,.what-if-form,.what-if-stats article,.what-if-coach,.what-if-empty,.portfolio-summary>*,.portfolio-table,.portfolio-empty,.debt-summary>div,.debt-table,.calendar-list,.calendar-entry) { border-color:#5a4c78; }
+.app-shell.kid-theme[data-theme="dark"] .workspace :is(input,select,textarea,.what-if-input,.amount-input,.select-wrap,.debt-input) { background-color:#231b38 !important; border-color:#675789 !important; color:#f4edff !important; -webkit-text-fill-color:#f4edff; color-scheme:dark; }
+.app-shell.kid-theme[data-theme="dark"] .workspace :is(input,textarea)::placeholder { color:#c8b9e4 !important; -webkit-text-fill-color:#c8b9e4; opacity:1; }
+.app-shell.kid-theme[data-theme="dark"] .workspace select option { background:#231b38; color:#f4edff; }
+.app-shell.kid-theme[data-theme="dark"] .workspace :is(.market-watch-card span,.market-watch-card b,.market-detail-grid span,.market-detail-grid b,.portfolio-summary b,.portfolio-empty b,.portfolio-empty small,.debt-summary span,.debt-summary b,.debt-row,.debt-row-name b,.debt-payoff,.calendar-entry-name b,.calendar-entry-date,.calendar-entry-amount) { color:#f0e8ff; }
+.app-shell.kid-theme[data-theme="dark"] :is(.kid-glossary,.theme-toggle) { border-color:#79659f; background:#302647; color:#fff1c4; box-shadow:3px 3px 0 #141025; }
+.app-shell.kid-theme[data-theme="dark"] .kid-glossary { border-color:#79659f; }
+.app-shell.kid-theme[data-theme="dark"] .kid-glossary strong { color:#bdeaff; }
+.app-shell.kid-theme[data-theme="dark"] .sidebar-link { color:#e6dcfa; }
+.app-shell.kid-theme[data-theme="dark"] .sidebar-link:hover,.app-shell.kid-theme[data-theme="dark"] .sidebar-link.active { background:#493966; color:#fff; }
+.app-shell.kid-theme[data-theme="dark"] .sidebar-profile small,.app-shell.kid-theme[data-theme="dark"] .sidebar-section-label { color:#ded3f3; }
+.app-shell.kid-theme[data-theme="dark"] :is(.theme-toggle-icon,.section-icon,.market-refresh,.portfolio-refresh) { color:#d0b8ff; }
