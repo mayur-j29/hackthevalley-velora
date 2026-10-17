@@ -478,3 +478,118 @@
 .app-shell.kid-theme[data-theme="dark"] .sidebar-link:hover,.app-shell.kid-theme[data-theme="dark"] .sidebar-link.active { background:#493966; color:#fff; }
 .app-shell.kid-theme[data-theme="dark"] .sidebar-profile small,.app-shell.kid-theme[data-theme="dark"] .sidebar-section-label { color:#ded3f3; }
 .app-shell.kid-theme[data-theme="dark"] :is(.theme-toggle-icon,.section-icon,.market-refresh,.portfolio-refresh) { color:#d0b8ff; }
+
+/* Professional themes take their complete palette from the three selected swatches. */
+.app-shell.professional-theme {
+  --theme-accent:var(--palette-accent);
+  --theme-accent-strong:var(--palette-accent);
+  --theme-accent-soft:var(--palette-canvas);
+  --theme-deep:var(--palette-accent);
+  --theme-shadow:var(--palette-accent);
+  --shell-accent:var(--palette-accent);
+  --shell-canvas:var(--palette-canvas);
+  --shell-surface:var(--palette-surface);
+  --shell-line:color-mix(in srgb,var(--palette-accent) 24%,var(--palette-surface));
+  --shell-muted:var(--palette-muted);
+  --shell-ink:var(--palette-ink);
+  --theme-ink:var(--palette-ink);
+  --theme-muted:var(--palette-muted);
+  --theme-line:var(--shell-line);
+  --theme-surface:var(--palette-surface);
+  --theme-inset:var(--palette-canvas);
+  --theme-bar:var(--palette-surface);
+  --green:var(--palette-accent);
+  --deep:var(--palette-accent);
+  --muted:var(--palette-muted);
+  --line:var(--shell-line);
+  --cream:var(--palette-surface);
+  --coral:var(--palette-accent);
+  color:var(--palette-ink);
+  background:var(--palette-canvas);
+  color-scheme:light;
+}
+.app-shell.professional-theme[data-theme="dark"] {
+  --palette-ink:#f4f6fa;
+  --palette-muted:#c6cfdb;
+  color:var(--palette-ink);
+  color-scheme:dark;
+}
+.app-shell.professional-theme[data-theme="light"] {
+  --palette-ink:#172435;
+  --palette-muted:#526174;
+  color:var(--palette-ink);
+  color-scheme:light;
+}
+.professional-theme :is(.sidebar,.topbar,.summary-card,.panel,.page-persona-tag,.wm-panel,.wm-account-label,.wm-stat-card,.wm-portfolio-card,.wm-market-panel,.wm-risk-panel,.simple-money-cards article,.simple-budget,.simple-risk,.simple-controls,.simple-risk-explain,.simple-holdings,.simple-decisions article,.simple-fill-summary,.simple-watch-grid article,.simple-universe,.simple-directory-list,.simple-directory-search,.simple-exchange-tabs,.simple-approval-panel,.simple-approval-panel article,.shared-portfolio,.shared-total,.shared-portfolio-summary article,.shared-holdings,.shared-orders,.market-watch-card,.market-detail-grid>div,.market-replay-details,.calendar-add-details,.debt-edit-details,.what-if-form,.what-if-stats article,.what-if-coach,.portfolio-table,.portfolio-empty,.debt-summary>div,.debt-table,.calendar-list,.calendar-entry,.copilot-panel,.automation-panel,.decision-panel,.subscriptions-panel,.bank-transfer-panel,.linked-bank-row,.transfer-list,.portfolio-panel,.market-panel,.agent-progress,.agent-review,.agent-result,.simple-trading,.simple-universe) {
+  background-color:var(--palette-surface) !important;
+  border-color:var(--shell-line) !important;
+  color:var(--palette-ink) !important;
+}
+.professional-theme .app-shell,.professional-theme .workspace,.professional-theme .dashboard { color:var(--palette-ink); }
+.professional-theme .sidebar-link,.professional-theme .sidebar-brand,.professional-theme .sidebar-profile b,.professional-theme .page-title-row h1,.professional-theme .panel-heading h2,.professional-theme .section-title h2,.professional-theme .market-head h2,.professional-theme .portfolio-head h2,.professional-theme .wm-panel h2,.professional-theme .simple-trading h2,.professional-theme .balance-amount,.professional-theme .metric-amount,.professional-theme .what-if-heading h2,.professional-theme .what-if-stats b,.professional-theme .portfolio-value-card>b,.professional-theme .wm-total-value,.professional-theme .shared-total b,.professional-theme .simple-money-cards article>b {
+  color:var(--palette-ink) !important;
+}
+.professional-theme :is(.sidebar-link.active,.sidebar-link:hover,.theme-toggle,.range-select,.live-pill,.forecast-tag,.market-refresh,.portfolio-refresh,.theme-choice.selected,.theme-choice:hover,.simple-action.buy,.simple-action.sell,.simple-action.hold,.simple-action.wait,.simple-pattern-badge,.simple-exchange-tabs button.active,.wm-tag,.wm-chip,.metric-icon,.section-icon,.simple-icon,.copilot-avatar,.agent-orb,.what-if-icon,.up-label,.small-green-dot,.status i,.live-pill i,.balance-spark path,.chart-line,.live-price-line,.replay-line,.wm-chart-line,.simple-primary,.trade-button,.paper-order-submit,.market-replay-button,.connect-plaid-button,.calendar-add-button,.what-if-submit,.setup-continue,.simple-approval-panel .approval-actions button:first-child,.wm-primary,.wm-crash-button) {
+  border-color:var(--shell-line);
+  accent-color:var(--palette-accent);
+}
+.professional-theme :is(.sidebar-link.active,.sidebar-link:hover,.theme-toggle-icon,.section-icon,.simple-icon,.what-if-icon,.market-refresh,.portfolio-refresh,.eyebrow,.page-title-row .eyebrow,.simple-kicker,.wm-eyebrow,.shared-portfolio .eyebrow,.metric-icon,.up-label,.text-button,.market-up,.market-down,.portfolio-positive,.portfolio-negative,.desk-positive,.desk-negative,.positive,.negative,.simple-pattern-bias,.simple-pattern-badge,.simple-action,.simple-dot,.small-green-dot,.income-icon,.safe-icon,.live-price-line,.chart-line,.replay-line,.balance-spark path,.wm-chart-line,.market-chart-line,.chart-line-positive,.chart-line-negative,.status i,.engine svg,.bank-icon,.live-pill,.forecast-tag,.agent-orb,.what-if-icon,.simple-stock-decision,.portfolio-summary b,.market-quote b,.market-watch-card>b,.simple-directory-item button,.simple-primary,.trade-button,.paper-order-submit,.market-replay-button,.connect-plaid-button,.calendar-add-button,.what-if-submit,.setup-continue,.wm-primary,.wm-crash-button,.simple-approval-panel .approval-actions button:first-child) {
+  color:var(--palette-accent) !important;
+}
+.professional-theme :is(.topbar,.sidebar-link.active,.theme-toggle,.simple-primary,.trade-button,.paper-order-submit,.market-replay-button,.connect-plaid-button,.calendar-add-button,.what-if-submit,.setup-continue,.wm-primary,.wm-crash-button,.simple-approval-panel .approval-actions button:first-child,.live-pill,.forecast-tag,.income-icon,.bill-icon,.safe-icon,.section-icon,.simple-icon,.what-if-icon,.wm-tag,.wm-chip,.bank-icon,.simple-action,.simple-pattern-badge,.simple-dot,.small-green-dot,.status i,.live-pill i) {
+  background-color:var(--palette-canvas);
+}
+.professional-theme :is(.panel,.summary-card,.page-persona-tag,.market-panel,.portfolio-panel,.shared-portfolio,.simple-trading,.simple-budget,.simple-risk,.simple-controls,.simple-risk-explain,.simple-money-cards article,.simple-holdings,.simple-decisions article,.simple-fill-summary,.simple-watch-grid article,.simple-universe,.simple-directory-list,.simple-directory-search,.simple-exchange-tabs,.simple-approval-panel,.simple-approval-panel article,.wm-panel,.wm-account-label,.wm-stat-card,.wm-portfolio-card,.wm-market-panel,.wm-risk-panel,.what-if-form,.what-if-stats article,.what-if-coach,.calendar-add-details,.debt-edit-details,.market-replay-details,.bank-transfer-panel,.linked-bank-row,.transfer-list,.portfolio-table,.debt-table,.calendar-list,.calendar-entry,.copilot-panel,.automation-panel,.decision-panel,.subscriptions-panel,.agent-progress,.agent-review,.agent-result) {
+  box-shadow:none;
+}
+.professional-theme :is(.page-title-row p,.section-description,.panel-heading p,.market-head p,.portfolio-head p,.card-topline,.metric-note,.metric-foot,.balance-foot,.chart-summary span,.chart-legend,.chart-labels,.axis-label,.market-data-meta,.market-boundary,.portfolio-boundary,.calendar-note,.debt-interest-note,.what-if-note,.what-if-empty,.what-if-stats span,.what-if-stats small,.simple-trading small,.wm-panel p,.wm-account-label small,.shared-portfolio small,.page-footer,.sidebar-profile small,.sidebar-section-label,.simple-risk-explain,.simple-pattern-explanation,.simple-pattern-bias,.simple-directory-item>small,.simple-directory-item>span>small,.simple-stock-decision>small,.simple-holding-header,.simple-holding,.simple-controls>div small,.simple-range-labels,.simple-budget>label,.market-controls label>span,.market-replay-form label>span,.paper-order-form>label>span,.paper-income-form small,.auto-invest-header small,.debt-summary span,.debt-row,.calendar-entry-name small,.bank-connect-callout small,.transfer-row small,.copilot-panel .ai-boundary,.ai-footnote,.agent-disclaimer,.agent-progress-heading small,.agent-stage,.market-chart-note,.disclaimer) {
+  color:var(--palette-muted) !important;
+}
+.professional-theme :is(input,select,textarea,.amount-input,.select-wrap,.debt-input,.what-if-input,.purchase-input,.copilot-form,.simple-directory-search,.wm-input) {
+  border-color:var(--shell-line);
+  background-color:var(--palette-surface);
+  color:var(--palette-ink);
+  accent-color:var(--palette-accent);
+  -webkit-text-fill-color:var(--palette-ink);
+}
+.professional-theme :is(input,textarea)::placeholder { color:var(--palette-muted); opacity:1; -webkit-text-fill-color:var(--palette-muted); }
+.professional-theme select option { background:var(--palette-surface); color:var(--palette-ink); }
+.professional-theme :is(button,a,input,select,textarea):focus-visible { outline-color:var(--palette-accent); }
+.professional-theme :is(.chart-line,.live-price-line,.replay-line,.wm-chart-line,.simple-candle.up line,.simple-candle.up rect) { stroke:var(--palette-accent); }
+.professional-theme :is(.simple-candle.up rect) { fill:var(--palette-accent); }
+.professional-theme :is(.metric-icon,.section-icon,.simple-icon,.what-if-icon,.wm-tag,.wm-chip,.live-pill,.forecast-tag,.bank-icon,.agent-orb,.copilot-avatar) { background:var(--palette-canvas); color:var(--palette-accent); }
+.professional-theme :is(.simple-pattern-badge.bullish,.simple-pattern-badge.bearish,.simple-pattern-badge.neutral,.simple-action.buy,.simple-action.sell,.simple-action.hold,.simple-action.wait,.portfolio-positive,.portfolio-negative,.market-up,.market-down,.desk-positive,.desk-negative,.positive,.negative) { color:var(--palette-accent) !important; }
+.professional-theme[data-theme="dark"] :is(.simple-primary,.trade-button,.paper-order-submit,.market-replay-button,.connect-plaid-button,.calendar-add-button,.what-if-submit,.setup-continue,.wm-primary,.wm-crash-button,.simple-approval-panel .approval-actions button:first-child,.topbar) { color:#172435; }
+.professional-theme[data-theme="light"] :is(.simple-primary,.trade-button,.paper-order-submit,.market-replay-button,.connect-plaid-button,.calendar-add-button,.what-if-submit,.setup-continue,.wm-primary,.wm-crash-button,.simple-approval-panel .approval-actions button:first-child,.topbar) { color:#fff; }
+.app-shell.professional-theme[data-theme="dark"] :is(input,select,textarea) { color:var(--palette-ink) !important; background-color:var(--palette-surface) !important; border-color:var(--shell-line) !important; -webkit-text-fill-color:var(--palette-ink); }
+.app-shell.professional-theme[data-theme="dark"] :is(input,textarea)::placeholder { color:var(--palette-muted) !important; -webkit-text-fill-color:var(--palette-muted); }
+.app-shell.professional-theme[data-theme="dark"] select option { background:var(--palette-surface); color:var(--palette-ink); }
+.professional-theme .topbar { background:var(--palette-surface); color:var(--palette-ink); border-bottom:1px solid var(--shell-line); }
+.professional-theme .topbar :is(.status,.engine,.icon-btn,.avatar,.session-button,.new-account-button) { color:var(--palette-ink); }
+.professional-theme .topbar :is(.session-button,.new-account-button) { border-color:var(--shell-line); background:var(--palette-canvas); }
+.professional-theme :is(.simple-primary,.trade-button,.paper-order-submit,.market-replay-button,.connect-plaid-button,.calendar-add-button,.what-if-submit,.setup-continue,.wm-primary,.wm-crash-button,.simple-approval-panel .approval-actions button:first-child) { background:var(--palette-accent) !important; border-color:var(--palette-accent) !important; }
+.professional-theme[data-theme="dark"] :is(.simple-primary,.trade-button,.paper-order-submit,.market-replay-button,.connect-plaid-button,.calendar-add-button,.what-if-submit,.setup-continue,.wm-primary,.wm-crash-button,.simple-approval-panel .approval-actions button:first-child) { color:#172435 !important; }
+.professional-theme[data-theme="light"] :is(.simple-primary,.trade-button,.paper-order-submit,.market-replay-button,.connect-plaid-button,.calendar-add-button,.what-if-submit,.setup-continue,.wm-primary,.wm-crash-button,.simple-approval-panel .approval-actions button:first-child) { color:#fff !important; }
+.professional-theme :is(.portfolio-message.error,.market-error,.market-verdict.blocked,.market-rails-off,.debt-interest-note.invalid,.portfolio-message.success,.market-ai-review.local,.agent-verdict.pass,.agent-verdict.block,.portfolio-warning,.simple-error,.what-if-error) { background:var(--palette-canvas); border-color:var(--shell-line); color:var(--palette-accent); }
+.professional-theme :is(.portfolio-message.error,.market-error,.market-verdict.blocked,.market-rails-off,.debt-interest-note.invalid,.portfolio-message.success,.market-ai-review.local,.agent-verdict.pass,.agent-verdict.block,.portfolio-warning,.simple-error,.what-if-error) :is(b,small,span,p) { color:var(--palette-accent); }
+.professional-theme :is(.income-icon,.bill-icon,.safe-icon,.violet-icon,.coral-icon,.green-icon,.metric-icon,.section-icon,.simple-icon,.simple-icon.ai,.what-if-icon,.wm-icon,.agent-orb,.copilot-avatar,.account-chip,.bank-icon,.account-badge,.live-pill,.forecast-tag,.market-connection-pill,.portfolio-paper-pill,.sim-only,.ai-mode,.market-safe-cap,.simple-action,.simple-pattern-badge,.wm-tag,.wm-chip) { background-color:var(--palette-canvas); color:var(--palette-accent); border-color:var(--shell-line); }
+.professional-theme :is(.chart-line,.live-price-line,.replay-line,.wm-chart-line) { stroke:var(--palette-accent); }
+.professional-theme :is(.event-dot,.small-green-dot,.simple-dot,.status i,.live-pill i,.impact-dot,.automation-pool i) { background-color:var(--palette-accent); }
+.professional-theme :is(.simple-candle.down line,.simple-candle.down rect,.replay-chart.negative .replay-line,.live-price-line.down,.market-down,.portfolio-negative,.desk-negative,.negative,.crash-note,.coral-text,.bill-alert) { color:var(--palette-accent) !important; stroke:var(--palette-accent) !important; }
+.professional-theme :is(.simple-candle.down rect,.replay-point,.crash-note,.bill-alert) { fill:var(--palette-accent) !important; }
+.professional-theme :is(.simple-candle.down rect,.crash-note,.bill-alert) { background:var(--palette-canvas) !important; border-color:var(--shell-line) !important; }
+.professional-account-setup { --palette-ink:#172435; --palette-muted:#526174; background:var(--palette-surface); border-color:var(--palette-accent); color:var(--palette-ink); }
+.professional-account-setup[data-theme="dark"] { --palette-ink:#f4f6fa; --palette-muted:#c6cfdb; }
+.professional-account-setup :is(h1,.setup-brand,.setup-lede,.setup-privacy,.setup-theme-picker>b) { color:var(--palette-ink); }
+.professional-account-setup :is(.setup-kicker,.setup-theme-picker>small,.setup-privacy,.setup-audience small) { color:var(--palette-muted); }
+.professional-account-setup .setup-audience { color:var(--palette-ink); background:var(--palette-canvas); border-color:color-mix(in srgb,var(--palette-accent) 28%,var(--palette-surface)); }
+.professional-account-setup .setup-audience.selected { background:var(--palette-surface); border-color:var(--palette-accent); box-shadow:0 0 0 2px color-mix(in srgb,var(--palette-accent) 20%,transparent); }
+.professional-account-setup .setup-audience-icon,.professional-account-setup .theme-radio { background:var(--palette-canvas); color:var(--palette-accent); border-color:var(--palette-accent); }
+.professional-account-setup .setup-continue { background:var(--palette-accent); border-color:var(--palette-accent); color:var(--palette-surface); }
+.professional-account-setup[data-theme="dark"] .setup-continue { color:#172435; }
+.professional-account-setup .theme-choice { color:var(--palette-ink); background:var(--palette-surface); border-color:color-mix(in srgb,var(--palette-accent) 28%,var(--palette-surface)); }
+.professional-account-setup[data-theme="dark"] .theme-choice { color:var(--palette-ink); }
+.professional-account-setup :is(input:not([type="checkbox"]),select,textarea) { border-color:color-mix(in srgb,var(--palette-accent) 32%,var(--palette-surface)); background:var(--palette-canvas); color:var(--palette-ink); -webkit-text-fill-color:var(--palette-ink); color-scheme:inherit; }
+.professional-account-setup[data-theme="dark"] :is(input:not([type="checkbox"]),select,textarea) { color-scheme:dark; }
+.professional-account-setup :is(input,select,textarea)::placeholder { color:var(--palette-muted); -webkit-text-fill-color:var(--palette-muted); opacity:1; }
+.professional-account-setup .brand-mark span { background:var(--palette-accent); }
