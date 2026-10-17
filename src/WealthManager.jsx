@@ -1,11 +1,22 @@
 import React, { useMemo, useState } from 'react';
 import { Activity, ArrowDownRight, ArrowUpRight, Bot, CalendarDays, ChevronDown, CircleDollarSign, RotateCcw, ShieldCheck, Sparkles, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
-import { ASSETS, PERSONAS, REGIMES, loadSimulation, saveSimulation } from './simulation.js';
+import { ASSETS, PERSONAS, REGIMES, buildBenchmarkSeries, loadSimulation, saveSimulation } from './simulation.ts';
 import { checkAgentAction, dailyDrawdown, DAILY_DRAWDOWN_LIMIT, generateFallbackActions, targetWeights } from './wealth-agent.js';
 import './wealth-manager.css';
 
 const money = value => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value);
 const precise = value => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format(value);
+function localChatAnswer(question, persona, portfolio, decisions, date) {
+  const sale = question.match(/\b(?:sell|selling|sold)\s+(?:of\s+)?([A-Z]{1,5})\b/i);
+  if (sale) {
+    const ticker = sale[1].toUpperCase();
+    const entry = decisions.find(item => item.actionType === 'sell' && item.ticker === ticker);
+    if (entry?.status === 'executed') return `Velora’s log shows a simulated ${ticker} sale on ${entry.simDate}: ${entry.reason} No real shares were sold.`;
+    return `I don’t see a recorded ${ticker} sale in Velora’s decision log, so I can’t give a reason for one.`;
+  }
+  if (/goal|track|progress|on track/i.test(question)) return `${persona.name}’s demo goal is “${persona.goal}” with a ${persona.horizonYears}-year horizon. Current simulated net worth is ${money(portfolio.netWorth)}; the profile has no target amount or dated milestone to measure progress against.`;
+  return `As of ${date}, simulated net worth is ${money(portfolio.netWorth)} with ${money(portfolio.cash)} cash and ${portfolio.holdings.length} holdings. I can only confirm trades that appear in the saved decision log.`;
+}
 
 function LineChart({ rows, selected }) {
   const points = rows.slice(-selected - 1);
@@ -16,6 +27,16 @@ function LineChart({ rows, selected }) {
   const coords = values.map((value, index) => `${index / Math.max(1, values.length - 1) * 760},${120 - ((value - low) / spread) * 96}`).join(' ');
   const rising = values.at(-1) >= values[0];
   return <div className="wm-chart-wrap"><svg className="wm-line-chart" viewBox="0 0 760 140" role="img" aria-label="Portfolio value history"><defs><linearGradient id="wealthFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor="#80c49b" stopOpacity=".24"/><stop offset="1" stopColor="#80c49b" stopOpacity="0"/></linearGradient></defs><polygon points={`0,140 ${coords} 760,140`} fill="url(#wealthFill)"/><polyline points={coords} fill="none" stroke={rising ? '#8acfa0' : '#df9283'} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke"/></svg><div className="wm-chart-labels"><span>{points[0]?.date}</span><span>{points.at(-1)?.date}</span></div></div>;
+}
+
+function BenchmarkChart({ rows }) {
+  if (rows.length < 2) return <div className="wm-no-events">Benchmark history is warming up.</div>;
+  const values = rows.flatMap(row => [row.managed, row.spy, row.cash]);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const spread = Math.max(max - min, max * 0.025, 1);
+  const points = key => rows.map((row, index) => `${index / Math.max(1, rows.length - 1) * 900},${125 - ((row[key] - min) / spread) * 100}`).join(' ');
+  return <div className="wm-benchmark-chart"><svg viewBox="0 0 900 145" role="img" aria-label="Velora managed portfolio compared with SPY and cash"><polyline points={points('managed')} fill="none" stroke="#8fc99b" strokeWidth="2.7" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke"/><polyline points={points('spy')} fill="none" stroke="#d2b379" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke"/><polyline points={points('cash')} fill="none" stroke="#84958b" strokeWidth="1.6" strokeDasharray="5 6" vectorEffect="non-scaling-stroke"/></svg><div className="wm-benchmark-dates"><span>{rows[0].date}</span><span>{rows.at(-1).date}</span></div><div className="wm-benchmark-legend"><span><i className="managed"/> Velora managed</span><span><i className="spy"/> Buy-and-hold SPY</span><span><i className="cash"/> Cash</span></div></div>;
 }
 
 export default function WealthManager() {
@@ -30,10 +51,16 @@ export default function WealthManager() {
   const [agentBusy, setAgentBusy] = useState(false);
   const [fastForwardBusy, setFastForwardBusy] = useState(false);
   const [cycleProgress, setCycleProgress] = useState('');
+  const [chatMessages, setChatMessages] = useState([]);
+  const [chatQuestion, setChatQuestion] = useState('');
+  const [chatBusy, setChatBusy] = useState(false);
+  const [chatFallback, setChatFallback] = useState(false);
   const [, setHistoryVersion] = useState(0);
   const portfolio = simulation.getPortfolio(accountId);
   const prices = simulation.getPrices();
-  const history = simulation.getHistory(accountId).portfolio;
+  const completeHistory = simulation.getHistory(accountId);
+  const history = completeHistory.portfolio;
+  const marketHistory = completeHistory.market;
   const activity = simulation.getActivity(accountId);
   const decisions = activity.decisions;
   const currentDrawdown = dailyDrawdown(history);
@@ -41,6 +68,9 @@ export default function WealthManager() {
   const persona = PERSONAS.find(item => item.id === accountId) || PERSONAS[1];
   const pnl = portfolio.netWorth - persona.startingCash;
   const pnlPct = persona.startingCash ? pnl / persona.startingCash * 100 : 0;
+  const benchmark = buildBenchmarkSeries({ portfolioHistory: history, spyHistory: marketHistory.SPY || [], startingCapital: persona.startingCash });
+  const benchmarkLatest = benchmark.at(-1);
+  const spyDifference = benchmarkLatest?.spy > 0 ? ((benchmarkLatest.managed / benchmarkLatest.spy) - 1) * 100 : 0;
   const allocation = useMemo(() => {
     const items = [{ label: 'Cash', value: portfolio.cash, color: '#8ea997' }, ...portfolio.holdings.map((holding, index) => ({ label: holding.ticker, value: holding.marketValue, color: ['#8dc89e', '#70ad88', '#b7cdbb', '#d0b48a', '#74947d', '#9ab7a0'][index % 6] }))].filter(item => item.value > 0);
     let total = 0;
@@ -62,6 +92,8 @@ export default function WealthManager() {
   function setPersona(id) {
     setAccountId(id);
     window.localStorage.setItem('velora-simulation-active-account', id);
+    setChatMessages([]);
+    setChatFallback(false);
   }
 
   function reset() {
@@ -70,6 +102,7 @@ export default function WealthManager() {
     saveSimulation(fresh);
     setHistoryVersion(value => value + 1);
     setMessage('All three demo accounts and the market have been reset.');
+    setChatMessages([]);
   }
 
   async function runCycle(progressLabel = 'Reviewing simulated prices, goals and portfolio…') {
@@ -207,6 +240,37 @@ export default function WealthManager() {
     await runCycle('Reviewing crash response and portfolio risk…');
   }
 
+  async function askQuestion(question = chatQuestion) {
+    const prompt = String(question || '').trim().slice(0, 280);
+    if (!prompt || chatBusy) return;
+    const currentPortfolio = simulation.getPortfolio(accountId);
+    const currentDecisions = simulation.getActivity(accountId).decisions;
+    const currentEvents = simulation.getEvents().slice(-8);
+    const submitted = { role: 'user', text: prompt };
+    setChatMessages(items => [...items, submitted].slice(-16));
+    setChatQuestion('');
+    setChatBusy(true);
+    let answer;
+    let source = 'ai';
+    try {
+      const controller = new AbortController();
+      const timer = window.setTimeout(() => controller.abort(), 8000);
+      try {
+        const response = await fetch('/api/wealth-chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: controller.signal, body: JSON.stringify({ accountId, asOf: simulation.getDate(), question: prompt, portfolio: currentPortfolio, events: currentEvents, decisions: currentDecisions.slice(0, 30) }) });
+        const payload = await response.json();
+        if (!response.ok || typeof payload.answer !== 'string') throw new Error('Advisor unavailable');
+        answer = payload.answer;
+        source = payload.source || 'ai';
+      } finally { window.clearTimeout(timer); }
+    } catch {
+      answer = localChatAnswer(prompt, persona, currentPortfolio, currentDecisions, simulation.getDate());
+      source = 'fallback';
+    }
+    setChatFallback(source === 'fallback');
+    setChatMessages(items => [...items, { role: 'assistant', text: answer, source }].slice(-16));
+    setChatBusy(false);
+  }
+
   const timelineIndex = Math.max(0, history.length - 1);
   const selectedIndex = Math.min(selectedTimeline, timelineIndex);
   const selectedHistory = history.slice(0, selectedIndex + 1).slice(-windowDays - 1);
@@ -236,9 +300,13 @@ export default function WealthManager() {
       <section className="wm-panel wm-allocation-panel"><div className="wm-panel-heading"><div><span className="wm-eyebrow">PORTFOLIO MIX</span><h2>Allocation</h2></div><span className="wm-sim-chip">SIMULATED</span></div><div className="wm-allocation-body"><div className="wm-donut" style={{ background: allocation.items.length ? allocation.background : '#273c33' }}><div><b>{portfolio.holdings.length}</b><small>holdings</small></div></div><div className="wm-allocation-legend">{allocation.items.map(item => <div key={item.label}><i style={{ background: item.color }}/><span>{item.label}</span><b>{money(item.value)}</b></div>)}</div></div></section>
     </div>
 
+    <section className="wm-panel wm-benchmark-panel"><div className="wm-panel-heading"><div><span className="wm-eyebrow">THE SAME SEEDED MARKET PATH</span><h2>Velora vs. buy-and-hold</h2></div><div className={`wm-benchmark-difference ${spyDifference >= 0 ? 'wm-positive' : 'wm-negative'}`}><b>{spyDifference >= 0 ? '+' : ''}{spyDifference.toFixed(2)}%</b><small>vs. SPY buy-and-hold</small></div></div><p className="wm-benchmark-copy">Starting capital is compared with the Velora-managed account, buy-and-hold SPY, and holding cash across the same simulated dates.</p><BenchmarkChart rows={benchmark}/></section>
+
     <section className="wm-panel wm-holdings-panel"><div className="wm-panel-heading"><div><span className="wm-eyebrow">YOUR INVESTMENTS</span><h2>Holdings</h2></div><span className="wm-holdings-note">Prices update as simulated time advances</span></div><div className="wm-table-scroll"><table><thead><tr><th>ASSET</th><th>SHARES</th><th>PRICE</th><th>MARKET VALUE</th><th>UNREALIZED P&amp;L</th></tr></thead><tbody>{portfolio.holdings.length ? portfolio.holdings.map(holding => <tr key={holding.ticker}><td><b className="wm-ticker">{holding.ticker}</b><span className="wm-asset-name">{holding.name} · {holding.type.toUpperCase()}</span></td><td>{holding.quantity.toFixed(4)}</td><td>{precise(prices.prices[holding.ticker])}</td><td>{precise(holding.marketValue)}</td><td className={holding.unrealizedPnl >= 0 ? 'wm-positive' : 'wm-negative'}>{holding.unrealizedPnl >= 0 ? '+' : '−'}{precise(Math.abs(holding.unrealizedPnl))}</td></tr>) : <tr><td colSpan="5" className="wm-empty-holdings"><span><Sparkles size={18}/><b>Your simulated portfolio is ready</b><small>AI recommendations will appear here after your first decision cycle.</small></span></td></tr>}</tbody></table></div></section>
 
     <section className="wm-panel wm-ai-activity"><div className="wm-panel-heading"><div><span className="wm-eyebrow">VELORA AI</span><h2>Activity feed</h2></div><span className={decisions[0]?.source === 'fallback' ? 'wm-source-badge fallback' : 'wm-source-badge'}>{decisions[0]?.source === 'fallback' ? 'FALLBACK MODE' : 'SIMULATION FEED'}</span></div>{decisions.length ? <div className="wm-decision-list">{decisions.slice(0, 12).map(decision => <article className="wm-decision" key={decision.id}><span className={`wm-decision-icon ${decision.status}`}><Sparkles size={14}/></span><div className="wm-decision-copy"><div className="wm-decision-title"><b>{decision.actionType.toUpperCase()} {decision.ticker !== '—' ? decision.ticker : ''}</b><span className={`wm-status-badge ${decision.status}`}>{decision.status}</span><span className={`wm-risk-badge ${decision.risk}`}>{decision.risk} risk</span></div><p>{decision.reason}</p><small>{decision.simDate} {decision.createdAt ? `· ${new Date(decision.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : ''} · {decision.source === 'fallback' ? 'fallback mode' : 'AI proposal'} · {Math.round((decision.confidence || 0) * 100)}% confidence{decision.amountUsd > 0 ? ` · ${money(decision.amountUsd)}` : ''}</small></div>{decision.status === 'pending' && <div className="wm-decision-actions"><button onClick={() => resolveProposal(decision, true)}>Approve</button><button onClick={() => resolveProposal(decision, false)}>Reject</button></div>}</article>)}</div> : <div className="wm-no-events">Run an AI cycle to see a portfolio review, risk level and proposed next steps.</div>}</section>
+
+    <section className="wm-panel wm-chat-panel"><div className="wm-panel-heading"><div><span className="wm-eyebrow">ASK VELORA</span><h2>Your simulated portfolio, explained.</h2></div><span className={chatFallback ? 'wm-source-badge fallback' : 'wm-source-badge'}>{chatFallback ? 'FALLBACK MODE' : 'GROUNDED IN YOUR LOG'}</span></div><div className="wm-chat-history" aria-live="polite">{chatMessages.length ? chatMessages.map((item, index) => <div className={`wm-chat-message ${item.role}`} key={`${index}-${item.role}`}><span>{item.role === 'user' ? 'You' : 'Velora'}</span><p>{item.text}</p></div>) : <div className="wm-chat-empty"><Bot size={17}/><span>Ask about a decision, your goal, or the current portfolio. Velora uses the saved activity log and will say when something is not recorded.</span></div>}{chatBusy && <div className="wm-chat-loading"><span className="wm-spinner"/> Reading the portfolio and activity log…</div>}</div><form className="wm-chat-form" onSubmit={event => { event.preventDefault(); askQuestion(); }}><input value={chatQuestion} onChange={event => setChatQuestion(event.target.value)} maxLength={280} placeholder="Ask about a decision or your goal…" aria-label="Ask Velora about your portfolio"/><button type="submit" disabled={chatBusy || !chatQuestion.trim()}>Ask <ArrowUpRight size={14}/></button></form><div className="wm-chat-prompts"><button type="button" onClick={() => askQuestion('Why did you sell TSLA?')} disabled={chatBusy}>Why did you sell TSLA?</button><button type="button" onClick={() => askQuestion('Am I on track for my goal?')} disabled={chatBusy}>Am I on track for my goal?</button></div><small className="wm-chat-disclaimer">Answers are based on this simulated account and saved decision log.</small></section>
 
     <div className="wm-bottom-grid"><section className="wm-panel wm-market-panel"><div className="wm-panel-heading"><div><span className="wm-eyebrow">MARKET SETTING</span><h2>Choose a market regime</h2></div><select value={prices.regime} onChange={event => update(() => simulation.setRegime(event.target.value))} aria-label="Market regime">{Object.keys(REGIMES).map(regime => <option value={regime} key={regime}>{regime[0].toUpperCase() + regime.slice(1)}</option>)}</select></div><p>Regimes change the drift and volatility used for every future simulated market day.</p><div className="wm-market-quotes">{Object.entries(ASSETS).slice(0, 5).map(([ticker, asset]) => <div key={ticker}><span>{ticker}</span><small>{asset.name}</small><b>{precise(prices.prices[ticker])}</b></div>)}</div><button className="wm-crash-button" disabled={agentBusy || fastForwardBusy} onClick={loadDemoCrash}>Load demo crash scenario <TrendingDown size={13}/></button></section>
       <section className="wm-panel wm-activity-panel"><div className="wm-panel-heading"><div><span className="wm-eyebrow">MARKET FEED</span><h2>Recent events</h2></div><span className="wm-feed-live"><i/> LIVE SIM</span></div>{simulation.getEvents().slice(-4).reverse().map(event => <article className="wm-event" key={event.id}><span className="wm-event-icon"><Activity size={15}/></span><div><b>{event.headline}</b><small>{event.date} · {event.tickers.join(', ')}</small></div></article>)}{!simulation.getEvents().length && <div className="wm-no-events">Market events will appear as the simulation advances.</div>}</section></div>

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ASSETS, PERSONAS, REGIMES, createSimulation, loadSimulation, saveSimulation } from './simulation.js';
+import { ASSETS, PERSONAS, REGIMES, buildBenchmarkSeries, createSimulation, loadSimulation, saveSimulation } from './simulation.ts';
 
 test('seeded simulation creates a full market and two years of price history', () => {
   const first = createSimulation({ seed: 12345, currentDate: '2026-10-17' });
@@ -61,6 +61,7 @@ test('state round trips and local persistence survives reload', () => {
   assert.deepEqual(restored.getActivity('marcus').pendingApprovals, [proposal.id]);
   const fresh = simulation.reset({ currentDate: '2026-10-17' });
   assert.equal(fresh.getPortfolio('marcus').netWorth, 25000);
+  assert.deepEqual(fresh.getPrices(), createSimulation({ seed: 42, currentDate: '2026-10-17' }).getPrices());
 });
 
 test('demo crash immediately shows a market drop while bonds remain defensive', () => {
@@ -71,4 +72,9 @@ test('demo crash immediately shows a market drop while bonds remain defensive', 
   assert.ok(result.after.prices.SPY < before.SPY);
   assert.equal(result.after.prices.BND, before.BND);
   assert.match(result.event.headline, /Demo scenario/);
+});
+
+test('benchmark series compares managed value, same-path SPY buy-and-hold, and cash', () => {
+  const series = buildBenchmarkSeries({ startingCapital: 1000, portfolioHistory: [{ date: '2026-01-01', value: 1000 }, { date: '2026-01-02', value: 1050 }], spyHistory: [{ date: '2026-01-01', close: 100 }, { date: '2026-01-02', close: 110 }] });
+  assert.deepEqual(series, [{ date: '2026-01-01', managed: 1000, spy: 1000, cash: 1000 }, { date: '2026-01-02', managed: 1050, spy: 1100, cash: 1000 }]);
 });

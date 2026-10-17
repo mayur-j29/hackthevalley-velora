@@ -1,6 +1,18 @@
 # Velora
 
-Velora is an educational money-planning prototype with a sidebar workspace for the overview, markets, portfolio, planning, and extra tools. It includes light and dark themes, a playful Kid experience with plain-language definitions, and a more restrained Teen and Adult experience. Paper orders stay in the browser.
+Velora’s primary **Wealth Manager** workspace runs a seeded, local-only market simulation with three dummy portfolios. Its prices are generated in the browser; no broker or market-data API is used by this workspace. Portfolio state and decisions persist in browser storage. Gemini is optional and runs only from server-side Vercel functions; without a key or when AI is unavailable, Velora uses deterministic persona-based rules.
+
+The existing educational planning, paper-trading, market replay, and Plaid Sandbox pages remain available from the sidebar. Those older pages retain their existing data providers and Sandbox-only bank flow; no page can connect to a brokerage or place a real securities order.
+
+## Simulated Wealth Manager
+
+- Aisha, Marcus, and Elena have seeded cash balances, goals, risk profiles, and horizons. The AI fallback uses visibly different target mixes for aggressive, balanced, and conservative profiles.
+- The simulated market includes ten stocks and ETFs, seeded geometric price paths, four switchable regimes, market events, simulated fees/slippage, and two years of chart history.
+- The Approve mode queues AI proposals for review. Auto mode applies the same deterministic limits: a 25% per-stock cap, persona cash buffers, three trades per cycle, no shorting or leverage, and a daily drawdown circuit breaker.
+- Fast-forward runs weekly AI cycles. Demo crash setup seeds a persona-based paper portfolio, applies a crash, and asks Velora to review risk. The SPY and cash comparisons use the same seeded history.
+- Ask Velora receives the active dummy account, its portfolio, market events, and saved decision log. It must rely on that log when describing trades; the fallback reports when no matching trade is recorded.
+
+Run `npm test` for the deterministic engine, agent guardrail, and API tests. Run `npm run typecheck` to check the TypeScript simulation core and `npm run build` to check the production bundle. To enable the live LLM routes, set the server-side `GEMINI_API_KEY`; the simulated market and rule fallback work without it.
 
 ## Run locally
 
@@ -17,11 +29,11 @@ The Trading page is a paper-trading workspace. Gemini can review candlestick pat
 
 Recurring contributions are simulated weekly, biweekly, or monthly. The deterministic rules engine checks the remaining forecast, configured reserve, and cash floor before every simulated contribution. The market page uses Yahoo Finance's chart endpoint via the server-side `api/market.js` route for one-minute intraday prices and daily adjusted closes. It shows today's prices and can replay a hypothetical buy-and-hold over a selected 6-month, 1-year, or 5-year window. Quotes may be delayed; provider availability and rate limits can affect refreshes. Historical replay is not a forecast, signal, or brokerage order.
 
-The Vite development server mounts local adapters for market data, Gemini, the stock directory, and the sandbox-only Plaid API. Add server-only keys to an untracked `.env.local` to enable Gemini and Twelve Data locally. Without Twelve Data, price data may fall back to Yahoo Finance but the full exchange directory is unavailable. Without Gemini, deterministic fallback rules remain active. Run `npm test` for rules and API validation tests, and `npm run build` for a production bundle.
+The Vite development server mounts local adapters for the legacy market tools, Gemini, the stock directory, and the Sandbox-only Plaid API. Add server-only keys to an untracked `.env.local` to enable Gemini and Twelve Data locally. Twelve Data is only used by the existing market and trading pages; the Wealth Manager uses its seeded simulated market. Without Gemini, its deterministic fallback rules remain active.
 
 ## Deploy the simulation
 
-Import the GitHub repository into Vercel using the Vite preset. Use `npm run build` as the build command and `dist` as the output directory; Vercel will deploy the functions in `api/` alongside the frontend. Add `GEMINI_API_KEY` and `TWELVE_DATA_API_KEY` in Vercel Project Settings → Environment Variables, then redeploy. These keys are read server-side only; never use `VITE_`-prefixed secrets. Add the **Sandbox-only** `PLAID_CLIENT_ID` / `PLAID_SECRET` only if Plaid Sandbox is wanted. There is no user authentication or shared server-side account database: editable plan items and practice portfolio state are stored in each browser's local storage.
+Import the GitHub repository into Vercel using the Vite preset. Use `npm run build` as the build command and `dist` as the output directory; Vercel deploys the functions in `api/` alongside the frontend. Add `GEMINI_API_KEY` in Vercel Project Settings → Environment Variables to enable LLM responses; without it, the wealth agent and chat advisor use their local rule fallbacks. `TWELVE_DATA_API_KEY` is optional for the existing market and trading pages. These keys are read server-side only; never use `VITE_`-prefixed secrets. Add the **Sandbox-only** `PLAID_CLIENT_ID` / `PLAID_SECRET` only if the legacy Plaid Sandbox page is wanted. There is no user authentication or shared server-side account database: simulated account state and other editable practice data are stored in each browser's local storage.
 
 ## Optional Gemini Copilot
 
@@ -31,7 +43,7 @@ The trading endpoint sends Gemini at most 10 symbols and 20 recent candles per s
 
 ## What is—and is not—live
 
-Market prices are fetched from an upstream public data source and may be delayed. Demo balances, portfolio cash, holdings, orders, default income/bills, and debt examples are synthetic. The only bank connection available is Plaid Sandbox. Velora does not execute or route securities orders, move real funds, or provide formal financial advice. Historical replay excludes taxes, fees, spreads, and actual fills. Past performance does not predict future results.
+The Wealth Manager's prices, balances, holdings, events, and orders are synthetic and seeded locally. The older Markets and AI Trading pages may fetch external quote data, and the legacy bank flow is Plaid Sandbox only. Velora does not connect to a broker, route securities orders, or move real funds. Simulated results are educational and are not financial advice; historical paths are not forecasts.
 
 Recurring auto-invest and historical market replays are paper simulations only. The strategy scan runs while the browser app is open, up to once per minute, and can only write to the local practice ledger. It does not connect to a broker, place real orders, or move money. Plaid is Sandbox-only. Gemini and candle patterns can be wrong and do not predict returns. A live brokerage product would require a separate authorized broker integration, authenticated brokerage accounts, secure background order infrastructure, explicit customer consents, audit and kill-switch controls, and security, operational, licensing, and legal/compliance work; adding credentials alone will not enable real trading.
 

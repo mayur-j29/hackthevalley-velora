@@ -5,9 +5,10 @@ import plaidHandler from './api/plaid.js';
 import stocksHandler from './api/stocks.js';
 import tradingAiHandler from './api/trading-ai.js';
 import wealthAiHandler from './api/wealth-ai.js';
+import wealthChatHandler from './api/wealth-chat.js';
 
 function localApiRoutes() {
-  const handlers = { copilot: copilotHandler, market: marketHandler, plaid: plaidHandler, stocks: stocksHandler, 'trading-ai': tradingAiHandler, 'wealth-ai': wealthAiHandler };
+  const handlers = { copilot: copilotHandler, market: marketHandler, plaid: plaidHandler, stocks: stocksHandler, 'trading-ai': tradingAiHandler, 'wealth-ai': wealthAiHandler, 'wealth-chat': wealthChatHandler };
   return {
     name: 'velora-local-api-routes',
     configResolved(config) {

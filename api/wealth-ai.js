@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ASSETS, PERSONAS } from '../src/simulation.js';
+import { ASSETS, PERSONAS } from '../src/simulation.ts';
 import { generateFallbackActions } from '../src/wealth-agent.js';
 
 const REQUEST_BUDGET_MS = 7800;

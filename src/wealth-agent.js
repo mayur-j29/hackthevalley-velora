@@ -1,4 +1,4 @@
-import { ASSETS, SLIPPAGE_RATE, TRADING_FEE_RATE } from './simulation.js';
+import { ASSETS, SLIPPAGE_RATE, TRADING_FEE_RATE } from './simulation.ts';
 
 export const MAX_TRADES_PER_CYCLE = 3;
 export const MAX_SINGLE_STOCK_WEIGHT = 0.25;
