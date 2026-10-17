@@ -351,3 +351,5 @@
 .app-shell:not(.kid-theme) .theme-radio i { background:var(--theme-accent); }
 .app-shell:not(.kid-theme) :is(.desk-fund-row input,.desk-toolbar select,.desk-reset):focus-visible,
 .app-shell:not(.kid-theme) :is(input,select,textarea,button):focus-visible { outline-color:var(--theme-accent); }
+.app-shell[data-theme="dark"] :is(.paper-income-form input,.paper-order-form input,.paper-order-form select) { color:#fff!important;-webkit-text-fill-color:#fff; }
+.app-shell[data-theme="light"] :is(.paper-income-form input,.paper-order-form input,.paper-order-form select) { color:#111!important;-webkit-text-fill-color:#111; }
