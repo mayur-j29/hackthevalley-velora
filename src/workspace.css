@@ -238,6 +238,28 @@
 .theme-radio { width:15px; height:15px; flex:none; display:grid; place-items:center; border:1px solid #9ca9a0; border-radius:50%; }
 .theme-choice.selected .theme-radio { border-color:#347954; }
 .theme-radio i { width:7px; height:7px; border-radius:50%; background:#347954; }
+
+/* Adult and teen palettes share tokens so every feature uses the selected hue. */
+.app-shell[data-palette="blue"] { --theme-accent:#245fb8; --theme-soft:#eaf1fc; --theme-deep:#17365e; --theme-shadow:#d0def2; --shell-accent:#245fb8; --shell-ink:#1d2d43; --shell-muted:#5b6b80; --shell-line:#dbe4f0; --shell-surface:#fff; --shell-canvas:#f5f8fd; }
+.app-shell[data-palette="gold"] { --theme-accent:#8a6114; --theme-soft:#f5ebcf; --theme-deep:#4d380a; --theme-shadow:#e8d8ad; --shell-accent:#8a6114; --shell-ink:#3c3018; --shell-muted:#756748; --shell-line:#e9dfc8; --shell-surface:#fffaf0; --shell-canvas:#f7f0df; }
+.app-shell[data-palette="slate"] { --theme-accent:#a9bfd8; --theme-soft:#303943; --theme-deep:#20252c; --theme-shadow:#14181e; --shell-accent:#a9bfd8; }
+.app-shell[data-palette="green"] { --theme-accent:#276747; --theme-soft:#e8f2e9; --theme-deep:#173d2e; --theme-shadow:#d2e4d5; --shell-accent:#276747; }
+.app-shell[data-palette="blue"][data-theme="dark"] { --theme-accent:#82adf5; --theme-soft:#26364b; --theme-deep:#162338; --theme-shadow:#101a28; --shell-accent:#82adf5; --shell-muted:#bdcbe0; --shell-line:#3e5169; --shell-surface:#202d3d; --shell-canvas:#151e2a; --field-bg:#182435; --field-border:#465a73; --field-text:#f1f5fb; --field-muted:#bdcbe0; }
+.app-shell[data-palette="gold"][data-theme="dark"] { --theme-accent:#e3bd6a; --theme-soft:#393323; --theme-deep:#29251a; --theme-shadow:#19170f; --shell-accent:#e3bd6a; --shell-muted:#d2c9ad; --shell-line:#554d37; --shell-surface:#302c21; --shell-canvas:#201e18; --field-bg:#25221a; --field-border:#5b523a; --field-text:#faf5e8; --field-muted:#d2c9ad; }
+.app-shell[data-palette="slate"][data-theme="dark"] { --theme-accent:#b5c5d8; --theme-soft:#303943; --theme-deep:#20252c; --theme-shadow:#14181e; --shell-accent:#b5c5d8; --shell-muted:#c1c9d2; --shell-line:#47515d; --shell-surface:#282e36; --shell-canvas:#1a1e24; --field-bg:#20252c; --field-border:#4c5865; --field-text:#f0f3f7; --field-muted:#c1c9d2; }
+.app-shell[data-palette="green"][data-theme="dark"] { --theme-accent:#8ad0a1; --theme-soft:#29382f; --theme-deep:#19251e; --theme-shadow:#101a14; --shell-accent:#8ad0a1; }
+.app-shell[data-palette]:not(.kid-theme) { --field-text:var(--shell-ink); }
+.app-shell[data-palette]:not(.kid-theme)[data-theme="dark"] { --field-text:var(--shell-ink); }
+.app-shell[data-palette="blue"] :is(.sidebar-brand,.page-title-row h1,.section-title h2,.panel-heading h2,.market-head h2,.portfolio-head h2),.app-shell[data-palette="gold"] :is(.sidebar-brand,.page-title-row h1,.section-title h2,.panel-heading h2,.market-head h2,.portfolio-head h2),.app-shell[data-palette="slate"] :is(.sidebar-brand,.page-title-row h1,.section-title h2,.panel-heading h2,.market-head h2,.portfolio-head h2) { color:var(--shell-ink); }
+.app-shell[data-palette="blue"] :is(.sidebar-link:hover,.sidebar-link.active) { background:var(--theme-soft); color:var(--theme-accent); }
+.app-shell[data-palette="gold"] :is(.sidebar-link:hover,.sidebar-link.active) { background:var(--theme-soft); color:var(--theme-accent); }
+.app-shell[data-palette="slate"] :is(.sidebar-link:hover,.sidebar-link.active) { background:var(--theme-soft); color:var(--theme-accent); }
+.app-shell[data-palette="blue"] .topbar,.app-shell[data-palette="gold"] .topbar,.app-shell[data-palette="slate"] .topbar { background:var(--theme-deep); }
+.app-shell[data-palette="blue"] :is(.live-price-line,.chart-line),.app-shell[data-palette="gold"] :is(.live-price-line,.chart-line),.app-shell[data-palette="slate"] :is(.live-price-line,.chart-line) { stroke:var(--theme-accent); }
+.app-shell[data-palette="blue"] :is(.market-watch-card:hover,.market-watch-card.selected,.theme-choice:hover,.theme-choice.selected),.app-shell[data-palette="gold"] :is(.market-watch-card:hover,.market-watch-card.selected,.theme-choice:hover,.theme-choice.selected),.app-shell[data-palette="slate"] :is(.market-watch-card:hover,.market-watch-card.selected,.theme-choice:hover,.theme-choice.selected) { border-color:var(--theme-accent); }
+.app-shell[data-palette="blue"] :is(.theme-choice.selected .theme-radio,.theme-radio i),.app-shell[data-palette="gold"] :is(.theme-choice.selected .theme-radio,.theme-radio i),.app-shell[data-palette="slate"] :is(.theme-choice.selected .theme-radio,.theme-radio i) { border-color:var(--theme-accent); background:var(--theme-accent); }
+.app-shell[data-palette="blue"] :is(button,input,select,textarea):focus-visible,.app-shell[data-palette="gold"] :is(button,input,select,textarea):focus-visible,.app-shell[data-palette="slate"] :is(button,input,select,textarea):focus-visible { outline-color:var(--theme-accent); }
+.app-shell[data-palette="blue"][data-theme="dark"] :is(.sidebar-link:hover,.sidebar-link.active),.app-shell[data-palette="gold"][data-theme="dark"] :is(.sidebar-link:hover,.sidebar-link.active),.app-shell[data-palette="slate"][data-theme="dark"] :is(.sidebar-link:hover,.sidebar-link.active) { color:var(--theme-accent); }
 .setup-theme-picker { margin:13px 0; }
 .setup-theme-picker> b,.setup-theme-picker>small { display:block; }
 .setup-theme-picker> b { color:#354b3b; font-size:12px; }

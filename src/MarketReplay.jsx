@@ -21,7 +21,7 @@ function HistoryChart({ result }) {
   const positive = result.profitLoss >= 0;
   return <div className="replay-chart-wrap">
     <svg className={`replay-chart ${positive ? 'positive' : 'negative'}`} viewBox="0 0 700 130" role="img" aria-label={`Historical hypothetical value from ${result.startDate} to ${result.endDate}`}>
-      <defs><linearGradient id="replayFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor={positive ? '#3c8860' : '#ca715d'} stopOpacity=".2"/><stop offset="100%" stopColor={positive ? '#3c8860' : '#ca715d'} stopOpacity="0"/></linearGradient></defs>
+      <defs><linearGradient id="replayFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor={positive ? 'var(--theme-accent, #3c8860)' : '#ca715d'} stopOpacity=".2"/><stop offset="100%" stopColor={positive ? 'var(--theme-accent, #3c8860)' : '#ca715d'} stopOpacity="0"/></linearGradient></defs>
       {[0, 1, 2].map(row => <line key={row} x1="20" x2="680" y1={28 + row * 38} y2={28 + row * 38} className="replay-grid"/>)}
       <polygon points={`20,105 ${line} 680,105`} fill="url(#replayFill)"/>
       <polyline points={line} className="replay-line"/>
@@ -39,7 +39,7 @@ function PriceChart({ points, symbol }) {
   const span = max - min || 1;
   const line = values.map((value, index) => `${24 + index / Math.max(1, values.length - 1) * 752},${112 - (value - min) / span * 86}`).join(' ');
   const rising = values.at(-1) >= values[0];
-  return <div className="live-price-chart"><div className="live-chart-heading"><b>{symbol === 'S&P 500' ? 'S&P 500 ETF proxy' : symbol} · price today</b><span>{money(min)} – {money(max)}</span></div><svg viewBox="0 0 800 140" role="img" aria-label={`${symbol} intraday prices`}><defs><linearGradient id="marketPriceFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor={rising ? '#37845c' : '#c56b5a'} stopOpacity=".2"/><stop offset="1" stopColor={rising ? '#37845c' : '#c56b5a'} stopOpacity="0"/></linearGradient></defs>{[0,1,2].map(row => <line key={row} x1="24" x2="776" y1={24 + row * 42} y2={24 + row * 42} className="replay-grid"/>)}<polygon points={`24,116 ${line} 776,116`} fill="url(#marketPriceFill)"/><polyline points={line} className={rising ? 'live-price-line' : 'live-price-line down'}/></svg><div className="live-chart-range"><span>Market open</span><span>Latest update</span></div></div>;
+  return <div className="live-price-chart"><div className="live-chart-heading"><b>{symbol === 'S&P 500' ? 'S&P 500 ETF proxy' : symbol} · price today</b><span>{money(min)} – {money(max)}</span></div><svg viewBox="0 0 800 140" role="img" aria-label={`${symbol} intraday prices`}><defs><linearGradient id="marketPriceFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor={rising ? 'var(--theme-accent, #37845c)' : '#c56b5a'} stopOpacity=".2"/><stop offset="1" stopColor={rising ? 'var(--theme-accent, #37845c)' : '#c56b5a'} stopOpacity="0"/></linearGradient></defs>{[0,1,2].map(row => <line key={row} x1="24" x2="776" y1={24 + row * 42} y2={24 + row * 42} className="replay-grid"/>)}<polygon points={`24,116 ${line} 776,116`} fill="url(#marketPriceFill)"/><polyline points={line} className={rising ? 'live-price-line' : 'live-price-line down'}/></svg><div className="live-chart-range"><span>Market open</span><span>Latest update</span></div></div>;
 }
 
 export default function MarketReplay({ safeSurplus, reserve, rails, persona = 'Adult', initialSymbol = 'S&P 500', onSymbolChange }) {
