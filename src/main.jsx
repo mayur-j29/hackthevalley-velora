@@ -18,7 +18,6 @@ import './what-if.css';
 
 const personas = ['Kid', 'Teen', 'Adult'];
 const DEMO_BANK = Object.freeze({ name: 'Everyday Chequing', institution: 'Velora Demo Bank', subtype: 'checking', mask: '4242', available: 25000, current: 25000, currency: 'CAD', accountId: 'velora-demo-checking' });
-const DEMO_PROFILE = Object.freeze({ id: 'velora-demo-profile', persona: 'Adult', firstName: 'Alex', createdAt: '2026-10-17T00:00:00.000Z', demo: true });
 const DEMO_CASH_EVENTS = Object.freeze([
   ...Array.from({ length: 30 }, (_, index) => ({ day: index + 1, title: 'Sample work earnings', amount: 500, kind: 'income' })),
   { day: 2, title: 'Rent', amount: -1450, kind: 'bill' },
@@ -43,7 +42,7 @@ const money = (value, digits = 0) => `$${new Intl.NumberFormat('en-CA', { maximu
 function readAccountProfile() {
   try {
     const account = JSON.parse(window.localStorage.getItem('velora-account-profile') || 'null');
-    return account && personas.includes(account.persona) && account.createdAt ? account : null;
+    return account && !account.demo && personas.includes(account.persona) && account.createdAt ? account : null;
   } catch { return null; }
 }
 
@@ -51,7 +50,7 @@ function readActiveAccountProfile() {
   try {
     if (window.localStorage.getItem('velora-session-ended') === 'true') return null;
   } catch { /* A browser without storage keeps the profile in this session. */ }
-  return readAccountProfile() || DEMO_PROFILE;
+  return readAccountProfile();
 }
 
 function readPalette() {
