@@ -593,3 +593,10 @@
 .professional-account-setup[data-theme="dark"] :is(input:not([type="checkbox"]),select,textarea) { color-scheme:dark; }
 .professional-account-setup :is(input,select,textarea)::placeholder { color:var(--palette-muted); -webkit-text-fill-color:var(--palette-muted); opacity:1; }
 .professional-account-setup .brand-mark span { background:var(--palette-accent); }
+.professional-theme .copilot-chat { background:var(--palette-canvas) !important; border-color:var(--shell-line) !important; }
+.professional-theme .copilot-chat-bubble { background:var(--palette-surface) !important; border-color:var(--shell-line) !important; color:var(--palette-ink) !important; box-shadow:none; }
+.professional-theme .copilot-chat-row.user .copilot-chat-bubble { background:var(--palette-canvas) !important; border-color:var(--shell-line) !important; color:var(--palette-ink) !important; }
+.professional-theme .copilot-chat-bubble>small,.professional-theme .copilot-new-chat { color:var(--palette-muted) !important; }
+.professional-theme .copilot-new-chat { border-color:var(--shell-line) !important; background:var(--palette-surface); }
+.professional-theme .copilot-chat-bubble.typing p i { background:var(--palette-accent); }
+.professional-theme .setup-continue,.professional-theme .theme-toggle,.professional-theme .page-persona-tag { box-shadow:none; }
