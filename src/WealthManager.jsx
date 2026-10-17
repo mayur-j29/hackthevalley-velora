@@ -2,11 +2,12 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Activity, ArrowDownRight, ArrowUpRight, Bot, CalendarDays, CircleDollarSign, RotateCcw, ShieldCheck, Sparkles, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
 import { ASSETS, PERSONAS, REGIMES, buildBenchmarkSeries, createSimulation, loadSimulation, saveSimulation } from './simulation.ts';
 import { checkAgentAction, dailyDrawdown, DAILY_DRAWDOWN_LIMIT, generateFallbackActions, targetWeights } from './wealth-agent.js';
-import { supabase, supabaseConfigured } from './supabase.js';
+import { supabase } from './supabase.js';
 import './wealth-manager.css';
 
-const money = value => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value);
-const precise = value => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format(value);
+const money = (value, currency = 'USD') => new Intl.NumberFormat(currency === 'CAD' ? 'en-CA' : 'en-US', { style: 'currency', currency, maximumFractionDigits: 0 }).format(value);
+const precise = (value, currency = 'USD') => new Intl.NumberFormat(currency === 'CAD' ? 'en-CA' : 'en-US', { style: 'currency', currency, maximumFractionDigits: 2 }).format(value);
+const supabaseConfigured = false;
 function localChatAnswer(question, persona, portfolio, decisions, date, userAccount) {
   const sale = question.match(/\b(?:sell|selling|sold)\s+(?:of\s+)?([A-Z]{1,5})\b/i);
   if (sale) {
@@ -47,9 +48,19 @@ function BenchmarkChart({ rows }) {
   return <div className="wm-benchmark-chart"><svg viewBox="0 0 900 145" role="img" aria-label="Velora managed portfolio compared with SPY and cash"><polyline points={points('managed')} fill="none" stroke="#8fc99b" strokeWidth="2.7" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke"/><polyline points={points('spy')} fill="none" stroke="#d2b379" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke"/><polyline points={points('cash')} fill="none" stroke="#84958b" strokeWidth="1.6" strokeDasharray="5 6" vectorEffect="non-scaling-stroke"/></svg><div className="wm-benchmark-dates"><span>{rows[0].date}</span><span>{rows.at(-1).date}</span></div><div className="wm-benchmark-legend"><span><i className="managed"/> Velora managed</span><span><i className="spy"/> Buy-and-hold SPY</span><span><i className="cash"/> Cash</span></div></div>;
 }
 
-export default function WealthManager({ userAccount }) {
+export default function WealthManager({ userAccount, paperAccount }) {
   const isAdult = userAccount?.persona === 'Adult';
-  const [simulation, setSimulation] = useState(() => loadSimulation());
+  const linkedAccountId = userAccount?.id ? `velora-${userAccount.id}` : null;
+  const [simulation, setSimulation] = useState(() => {
+    const loaded = loadSimulation();
+    if (linkedAccountId) {
+      const localProfile = readLocalUserProfile() || { name: userAccount.firstName || 'Your', age: userAccount.persona === 'Teen' ? 18 : 35, occupation: userAccount.persona === 'Teen' ? 'Student' : 'Working professional', risk: 'balanced', goal: 'Build long-term wealth', horizonYears: 20 };
+      const fx = Number(paperAccount?.fxUsdCad) || null;
+      const startingCashCad = Number(paperAccount?.bankCash || 0) + Number(paperAccount?.cash || 0) + Object.entries(paperAccount?.positions || {}).reduce((sum, [symbol, item]) => sum + (Number(item.shares) || 0) * (Number(item.mark) || Number(item.entryPrice) || 0) * (symbol.endsWith(':TSX') ? 1 : fx || 0), 0);
+      loaded.ensureAccount({ id: linkedAccountId, name: localProfile.name, age: localProfile.age, occupation: localProfile.occupation || 'Personal account', risk: localProfile.risk || 'balanced', horizonYears: localProfile.horizonYears || 20, goal: localProfile.goal || 'Manage my money', startingCash: fx ? startingCashCad / fx : 0, cashBuffer: 0.1 });
+    }
+    return loaded;
+  });
   const [session, setSession] = useState(null);
   const [authStatus, setAuthStatus] = useState(supabaseConfigured ? 'loading' : 'local');
   const [authMode, setAuthMode] = useState('signup');
@@ -65,10 +76,11 @@ export default function WealthManager({ userAccount }) {
   const sessionRef = useRef(null);
   const cloudReadyUserRef = useRef(null);
   const saveQueueRef = useRef(Promise.resolve());
-  const [accountId, setAccountId] = useState(() => {
-    const saved = window.localStorage.getItem('velora-simulation-active-account');
+  const [accountId, setAccountId] = useState(() => linkedAccountId || (() => {
+    const key = userAccount?.id ? `velora-simulation-active-account-${userAccount.id}` : 'velora-simulation-active-account';
+    const saved = window.localStorage.getItem(key);
     return PERSONAS.some(person => person.id === saved) ? saved : 'marcus';
-  });
+  })());
   const [windowDays, setWindowDays] = useState(365);
   const [selectedTimeline, setSelectedTimeline] = useState(729);
   const [message, setMessage] = useState('');
@@ -82,7 +94,13 @@ export default function WealthManager({ userAccount }) {
   const [, setHistoryVersion] = useState(0);
 
   useEffect(() => {
-    if (!supabaseConfigured) return undefined;
+    if (!supabaseConfigured) {
+      if (!userAccount || !linkedAccountId) return undefined;
+      const localProfile = readLocalUserProfile() || { name: userAccount.firstName || 'Your', age: userAccount.persona === 'Teen' ? 18 : 35, occupation: userAccount.persona === 'Teen' ? 'Student' : 'Working professional', risk: 'balanced', goal: 'Build long-term wealth', horizonYears: 20 };
+      saveSimulation(simulation);
+      setAccountId(linkedAccountId); setUserProfile(localProfile); setProfileDraft(current => ({ ...current, ...localProfile })); setHistoryVersion(value => value + 1);
+      return undefined;
+    }
     let active = true;
     async function hydrate(nextSession) {
       sessionRef.current = nextSession;
@@ -107,13 +125,27 @@ export default function WealthManager({ userAccount }) {
           if (insertError) throw insertError;
         }
         if (!active || sessionRef.current?.user?.id !== nextSession.user.id) return;
-        setSimulation(restored);
         const savedProfile = data?.profile && typeof data.profile.name === 'string' ? data.profile : null;
-        setUserProfile(savedProfile);
-        const savedAccount = window.localStorage.getItem(`velora-simulation-active-account-${nextSession.user.id}`);
-        const riskPersona = savedProfile?.risk === 'aggressive' ? 'aisha' : savedProfile?.risk === 'conservative' ? 'elena' : 'marcus';
-        setAccountId(PERSONAS.some(person => person.id === savedAccount) ? savedAccount : riskPersona);
-        if (savedProfile) setProfileDraft(current => ({ ...current, ...savedProfile }));
+        const defaultProfile = userAccount ? { name: userAccount.firstName || nextSession.user.email?.split('@')[0] || 'Your', age: userAccount.persona === 'Teen' ? 18 : 35, occupation: userAccount.persona === 'Teen' ? 'Student' : 'Working professional', risk: 'balanced', goal: 'Build long-term wealth', horizonYears: 20 } : null;
+        const activeProfile = savedProfile || defaultProfile;
+        if (linkedAccountId) {
+          const startingCashCad = Math.max(0, Number(paperAccount?.bankCash || 0) + Number(paperAccount?.cash || 0) + Object.entries(paperAccount?.positions || {}).reduce((sum, [symbol, item]) => sum + (Number(item.shares) || 0) * (Number(item.mark) || Number(item.entryPrice) || 0) * (symbol.endsWith(':TSX') ? 1 : Number(paperAccount?.fxUsdCad) || 1.36), 0));
+          const startingCash = startingCashCad / (Number(paperAccount?.fxUsdCad) || 1.36);
+          const linkedPersona = { id: linkedAccountId, name: activeProfile?.name || userAccount.firstName || 'Your account', age: activeProfile?.age || 35, occupation: activeProfile?.occupation || 'Personal account', risk: activeProfile?.risk || 'balanced', horizonYears: activeProfile?.horizonYears || 20, goal: activeProfile?.goal || 'Manage my money', startingCash, cashBuffer: 0.1 };
+          const added = restored.ensureAccount(linkedPersona);
+          setAccountId(linkedAccountId);
+          if (added) {
+            const { error: accountSaveError } = await supabase.from('velora_simulations').upsert({ user_id: nextSession.user.id, state: restored.exportState(), profile: activeProfile || {}, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
+            if (accountSaveError) throw accountSaveError;
+          }
+        } else {
+          const savedAccount = window.localStorage.getItem(`velora-simulation-active-account-${nextSession.user.id}`);
+          const riskPersona = savedProfile?.risk === 'aggressive' ? 'aisha' : savedProfile?.risk === 'conservative' ? 'elena' : 'marcus';
+          setAccountId(PERSONAS.some(person => person.id === savedAccount) ? savedAccount : riskPersona);
+        }
+        setSimulation(restored);
+        setUserProfile(activeProfile);
+        if (activeProfile) setProfileDraft(current => ({ ...current, ...activeProfile }));
         cloudReadyUserRef.current = nextSession.user.id;
         setAuthStatus('ready');
         setHistoryVersion(value => value + 1);
@@ -133,7 +165,7 @@ export default function WealthManager({ userAccount }) {
       if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'USER_UPDATED') void hydrate(nextSession);
     });
     return () => { active = false; subscription.unsubscribe(); };
-  }, []);
+  }, [linkedAccountId]);
 
   function persistSimulation(target = simulation) {
     if (!supabaseConfigured) return saveSimulation(target);
@@ -209,6 +241,14 @@ export default function WealthManager({ userAccount }) {
     setProfileBusy(false);
   }
   const portfolio = simulation.getPortfolio(accountId);
+  const linkedBankCash = Number(paperAccount?.bankCash) || 0;
+  const linkedTradingCash = Number(paperAccount?.cash) || 0;
+  const linkedHoldings = Object.values(paperAccount?.positions || {});
+  const linkedFx = Number(paperAccount?.fxUsdCad) || null;
+  const linkedNeedsFx = Object.keys(paperAccount?.positions || {}).some(symbol => !symbol.endsWith(':TSX'));
+  const linkedStockValue = Object.entries(paperAccount?.positions || {}).reduce((sum, [symbol, item]) => sum + (Number(item.shares) || 0) * (Number(item.mark) || Number(item.entryPrice) || 0) * (symbol.endsWith(':TSX') ? 1 : linkedFx || 0), 0);
+  const linkedOpenProfit = Object.entries(paperAccount?.positions || {}).reduce((sum, [symbol, item]) => sum + ((Number(item.mark) || Number(item.entryPrice) || 0) * (symbol.endsWith(':TSX') ? 1 : linkedFx || 0) - (Number(item.entryCostCadPerShare) || (Number(item.entryPrice) || 0) * (symbol.endsWith(':TSX') ? 1 : Number(item.entryFxUsdCad) || linkedFx || 0))) * (Number(item.shares) || 0), 0);
+  const linkedProfit = (Number(paperAccount?.realizedPnl) || 0) + linkedOpenProfit;
   const prices = simulation.getPrices();
   const completeHistory = simulation.getHistory(accountId);
   const history = completeHistory.portfolio;
@@ -243,7 +283,8 @@ export default function WealthManager({ userAccount }) {
 
   function setPersona(id) {
     setAccountId(id);
-    window.localStorage.setItem(session?.user?.id ? `velora-simulation-active-account-${session.user.id}` : 'velora-simulation-active-account', id);
+    const key = session?.user?.id ? `velora-simulation-active-account-${session.user.id}` : userAccount?.id ? `velora-simulation-active-account-${userAccount.id}` : 'velora-simulation-active-account';
+    window.localStorage.setItem(key, id);
     setChatMessages([]);
     setChatFallback(false);
   }
@@ -444,7 +485,7 @@ export default function WealthManager({ userAccount }) {
     {authStatus === 'error' && <button className="wm-auth-switch" onClick={async () => { await supabase.auth.signOut(); setAuthStatus('signedout'); setAuthError(''); }}>Sign out and try again</button>}
     <small>Simulated environment only. No real money or brokerage account is connected.</small>
   </section>;
-  if ((!supabaseConfigured || authStatus === 'ready') && !userProfile) return <section className="wm-auth-card wm-profile-card">
+  if ((!supabaseConfigured || authStatus === 'ready') && !userProfile && !userAccount) return <section className="wm-auth-card wm-profile-card">
     <div className="wm-brand-lockup"><span className="wm-brand-icon"><span/><span/><span/></span><div><b>velora</b><small>SIMULATED WEALTH</small></div></div>
     <span className="wm-eyebrow">YOUR STARTING PROFILE</span>
     <h1>Who are you?</h1>
@@ -470,8 +511,10 @@ export default function WealthManager({ userAccount }) {
 
     <section className="wm-welcome-row"><div><div className="wm-eyebrow">{isAdult ? 'PERSONAL WEALTH PLAN' : 'YOUR SIMULATED WEALTH PLAN'}</div><h1>Good day, {userProfile?.name || userAccount?.firstName || persona.name}.</h1><p>{userProfile ? `Your portfolio is personalized for a ${userProfile.risk} risk profile.` : 'Your portfolio, market and AI activity in one calm view.'}</p></div><div className="wm-account-label"><span>YOUR ACCOUNT</span><b>{userAccount?.persona || 'Personal'} {isAdult ? 'portfolio' : 'practice portfolio'}</b><small>{isAdult ? 'Educational market simulation' : 'Simulated environment'}</small></div></section>
 
-    <section className="wm-metrics" aria-label="Portfolio summary">
-      <article className="wm-metric wm-net-worth"><div className="wm-metric-label">NET WORTH <CircleDollarSign size={16}/></div><strong>{money(portfolio.netWorth)}</strong><span>USD · simulated account</span><div className="wm-metric-spark"><Activity size={16}/><span>{pnl >= 0 ? '+' : ''}{money(pnl)} since start</span></div></article>
+    {userAccount && <section className="wm-linked-account"><div className="wm-linked-account-heading"><div><span className="wm-eyebrow">CONNECTED VELORA ACCOUNT · CAD</span><h2>{userAccount.firstName ? `${userAccount.firstName}’s account` : 'Your account'}</h2></div><small>Same cash and paper holdings shown on Trading and Portfolio</small></div><div className="wm-linked-account-metrics"><article><span>Account cash</span><b>{money(linkedBankCash + linkedTradingCash, 'CAD')}</b><small>{money(linkedBankCash, 'CAD')} available to allocate · {money(linkedTradingCash, 'CAD')} ready for orders</small></article><article><span>Stock value</span><b>{linkedNeedsFx && !linkedFx ? '—' : money(linkedStockValue, 'CAD')}</b><small>{linkedNeedsFx && !linkedFx ? 'Waiting for USD/CAD quote' : `${linkedHoldings.length} holdings from your Velora portfolio`}</small></article><article><span>Account profit / loss</span><b className={linkedProfit >= 0 ? 'wm-positive' : 'wm-negative'}>{linkedNeedsFx && !linkedFx ? '—' : `${linkedProfit >= 0 ? '+' : '−'}${money(Math.abs(linkedProfit), 'CAD')}`}</b><small>{linkedNeedsFx && !linkedFx ? 'Waiting for USD/CAD quote' : 'Realized + current gains/losses, converted to CAD'}</small></article></div></section>}
+
+    <section className="wm-metrics" aria-label="Wealth Manager simulation summary">
+      <article className="wm-metric wm-net-worth"><div className="wm-metric-label">SIMULATION VALUE <CircleDollarSign size={16}/></div><strong>{money(portfolio.netWorth)}</strong><span>USD · separate Wealth Manager model</span><div className="wm-metric-spark"><Activity size={16}/><span>{pnl >= 0 ? '+' : ''}{money(pnl)} since start</span></div></article>
       <article className="wm-metric"><div className="wm-metric-label">TOTAL P&amp;L <span className={pnl >= 0 ? 'wm-positive' : 'wm-negative'}>{pnl >= 0 ? <TrendingUp size={15}/> : <TrendingDown size={15}/>}</span></div><strong className={pnl >= 0 ? 'wm-positive' : 'wm-negative'}>{pnl >= 0 ? '+' : '−'}{money(Math.abs(pnl))}</strong><span className={pnl >= 0 ? 'wm-positive' : 'wm-negative'}>{pnlPct >= 0 ? '+' : ''}{pnlPct.toFixed(2)}% overall</span></article>
       <article className="wm-metric"><div className="wm-metric-label">SIMULATED CASH <Wallet size={16}/></div><strong>{money(portfolio.cash)}</strong><span>{(portfolio.cash / portfolio.netWorth * 100 || 0).toFixed(0)}% of net worth</span></article>
       <article className="wm-metric"><div className="wm-metric-label">RISK PROFILE <ShieldCheck size={16}/></div><strong className="wm-risk-name">{persona.risk}</strong><span>{persona.horizonYears}-year investing horizon</span></article>

@@ -45,6 +45,7 @@ export interface Simulation {
   getEvents(): MarketEvent[];
   getDate(): string;
   getAccounts(): Persona[];
+  ensureAccount(persona: Persona): boolean;
 }
 
 export const ASSETS: Readonly<Record<string, Asset>> = Object.freeze({
@@ -188,6 +189,14 @@ export function createSimulation(options: SimulationOptions = {}): Simulation {
     return accounts[id];
   }
 
+  function ensureAccount(persona: Persona): boolean {
+    if (!persona?.id || accounts[persona.id]) return false;
+    const startingCash = Number(persona.startingCash);
+    if (!Number.isFinite(startingCash) || startingCash < 0) throw new Error('The account starting balance is invalid.');
+    accounts[persona.id] = createAccount({ ...persona, startingCash }, date);
+    return true;
+  }
+
   function advanceTime(days = 1): { date: string; prices: SimulationPrices; events: MarketEvent[] } {
     const count = Number(days);
     if (!Number.isInteger(count) || count < 1 || count > 366) throw new Error('Advance must be between 1 and 366 days.');
@@ -326,7 +335,7 @@ export function createSimulation(options: SimulationOptions = {}): Simulation {
     return createSimulation({ seed: resetOptions.seed ?? initialSeed, currentDate: resetOptions.currentDate, regime: resetOptions.regime ?? 'sideways' });
   }
 
-  return { advanceTime, getPrices, getPortfolio, getHistory, getActivity, setTradingMode, addDecision, updateDecision, placeOrder, setRegime, setDemoCrash, exportState, importState, reset, getEvents: () => clone(events), getDate: () => isoDate(date), getAccounts: () => Object.values(accounts).map(account => ({ ...account.profile })) };
+  return { advanceTime, getPrices, getPortfolio, getHistory, getActivity, setTradingMode, addDecision, updateDecision, placeOrder, setRegime, setDemoCrash, exportState, importState, reset, getEvents: () => clone(events), getDate: () => isoDate(date), getAccounts: () => Object.values(accounts).map(account => ({ ...account.profile })), ensureAccount };
 }
 
 export function loadSimulation(storage: SimulationStorage | undefined = globalThis.localStorage): Simulation {

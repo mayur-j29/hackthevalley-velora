@@ -33,16 +33,7 @@ The Vite development server mounts local adapters for the legacy market tools, G
 
 ## Deploy the simulation
 
-Import the GitHub repository into Vercel using the Vite preset. Use `npm run build` as the build command and `dist` as the output directory; Vercel deploys the functions in `api/` alongside the frontend. Add `GEMINI_API_KEY` in Vercel Project Settings → Environment Variables to enable LLM responses; without it, the wealth agent and chat advisor use their local rule fallbacks. `TWELVE_DATA_API_KEY` is optional for the existing market and trading pages. These keys are read server-side only; never use `VITE_`-prefixed secrets. Add the **Sandbox-only** `PLAID_CLIENT_ID` / `PLAID_SECRET` only if the legacy Plaid Sandbox page is wanted. The Wealth Manager can use Supabase email/password authentication and private cloud saves; the older planning and paper-trading pages still use this browser's local storage.
-
-### Enable account sign-in and cloud saves
-
-1. Create a Supabase project and run [`supabase/schema.sql`](supabase/schema.sql) in its SQL Editor.
-2. In Supabase Authentication, enable email/password sign-in and set the Site URL and allowed redirect URLs to your Vercel domain (and `http://localhost:5173` for local development).
-3. Copy the project URL and public anon/publishable key from the Supabase API settings. Add the same values to Vercel as `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `SUPABASE_URL`, and `SUPABASE_ANON_KEY` for Production and Preview. Use only the anon/publishable key; never expose or use `service_role` in this app.
-4. Redeploy. The Wealth Manager asks each user to sign in or create an account, collects their profile, and saves simulated accounts and decision history in a row protected by Supabase Row Level Security.
-
-For local development, put those four Supabase values in the untracked `.env.local`. Run the SQL schema once per Supabase project. If email confirmation is enabled, users confirm their address before signing in.
+Import the GitHub repository into Vercel using the Vite preset. Use `npm run build` as the build command and `dist` as the output directory; Vercel deploys the functions in `api/` alongside the frontend. Add `GEMINI_API_KEY` in Vercel Project Settings → Environment Variables to enable LLM responses; without it, the wealth agent and chat advisor use their local rule fallbacks. `TWELVE_DATA_API_KEY` is optional for stock directory search and market candles; Yahoo Finance is used as a fallback. These keys are read server-side only; never use `VITE_`-prefixed secrets. Add the **Sandbox-only** `PLAID_CLIENT_ID` / `PLAID_SECRET` only if the legacy Plaid Sandbox page is wanted. Velora accounts are stored locally in the current browser profile, so separate Chrome profiles keep separate account data.
 
 ## Optional Gemini Copilot
 

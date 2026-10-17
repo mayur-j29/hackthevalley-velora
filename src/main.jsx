@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Activity, ArrowDownLeft, ArrowUpRight, Bell, BookOpenCheck, CalendarDays, Check, ChevronDown, CircleDollarSign, CircleHelp, Clock3, CreditCard, Landmark, LockKeyhole, ShieldCheck, Sparkles, TrendingDown, TrendingUp, Wallet, Wrench, X, LayoutDashboard, BriefcaseBusiness, Sun, Moon } from 'lucide-react';
+import { Activity, ArrowDownLeft, ArrowUpRight, Bell, BookOpenCheck, CalendarDays, Check, ChevronDown, CircleDollarSign, CircleHelp, Clock3, CreditCard, Landmark, ShieldCheck, Sparkles, TrendingDown, TrendingUp, Wallet, Wrench, X, LayoutDashboard, BriefcaseBusiness, Sun, Moon } from 'lucide-react';
 import { buildForecast, crashScenarios, evaluateSimulatedTrade, getSafeSurplus, simulateAutoInvest } from './finance';
 import MarketReplay from './MarketReplay';
 import PaperPortfolio from './PaperPortfolio';
@@ -565,7 +565,7 @@ function App() {
       {['Overview','Portfolio','Tools','Learn'].includes(activePage) && <div className="page-title-row"><div><div className="eyebrow">{activePageLabel.toUpperCase()}</div><h1>{activePage === 'Overview' ? (accountProfile?.firstName ? `Welcome, ${accountProfile.firstName}` : displayName) : activePageLabel}</h1><p>{activePage === 'Overview' ? personaCopy : activePage === 'Portfolio' ? (persona === 'Adult' ? 'Account cash, investments, and recent activity.' : 'Your practice cash, stocks, and recent decisions.') : activePage === 'Learn' ? 'Short, friendly lessons about money, stocks, and chart patterns.' : persona === 'Adult' ? 'Review your financial planning tools.' : 'Explore guarded tools for your practice account.'}</p></div><span className="page-persona-tag">{linkedAccount ? 'Plaid Sandbox' : persona === 'Adult' ? 'Personal account' : 'Demo account'} · {persona}</span></div>}
       <div className="page-content">
       {activePage === 'Learn' && persona === 'Kid' && <KidLearning/>}
-      {activePage === 'Wealth' && persona !== 'Kid' && <WealthManager userAccount={accountProfile}/>}
+      {activePage === 'Wealth' && persona !== 'Kid' && <WealthManager userAccount={accountProfile} paperAccount={paperAccount}/>}
       <div style={{ display: activePage === 'Trading' ? 'block' : 'none' }} aria-hidden={activePage !== 'Trading'}><TradingDesk key={accountProfile?.id || 'no-account'} persona={persona}/></div>
       {activePage === 'WhatIf' && <WhatIfCoach persona={persona} cash={whatIfCash - purchase} income={income} bills={bills} safeSurplus={safeSurplus} projectedLow={lowestBalance} reserve={reserve}/>}
       {activePage === 'Overview' && <>

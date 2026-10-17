@@ -7,6 +7,8 @@ export function createInitialPaperAccount() {
     version: 1,
     bankCash: 20000,
     cash: 5000,
+    currency: 'CAD',
+    fxUsdCad: null,
     positions: {},
     fills: [],
     decisions: [],
@@ -63,9 +65,11 @@ export function subscribePaperAccount(onChange) {
 }
 
 export function paperAccountValue(account, prices = {}) {
+  const fx = Number(account?.fxUsdCad) > 0 ? Number(account.fxUsdCad) : 1.36;
   const positions = Object.entries(account?.positions || {}).reduce((sum, [symbol, position]) => {
     const price = Number(prices[symbol]) || Number(position.mark) || Number(position.entryPrice) || 0;
-    return sum + price * (Number(position.shares) || 0);
+    const currencyFactor = symbol.endsWith(':TSX') ? 1 : fx;
+    return sum + price * (Number(position.shares) || 0) * currencyFactor;
   }, 0);
   return Number(account?.bankCash || 0) + Number(account?.cash || 0) + positions;
 }

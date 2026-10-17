@@ -8,7 +8,13 @@ const options = [
   { label: 'S&P 500 · SPY ETF proxy', symbol: 'S&P 500' },
   { label: 'Apple · AAPL', symbol: 'AAPL' },
   { label: 'Microsoft · MSFT', symbol: 'MSFT' },
+  { label: 'NVIDIA · NVDA', symbol: 'NVDA' },
+  { label: 'Amazon · AMZN', symbol: 'AMZN' },
+  { label: 'Alphabet · GOOGL', symbol: 'GOOGL' },
   { label: 'Tesla · TSLA', symbol: 'TSLA' },
+  { label: 'Broadcom · AVGO', symbol: 'AVGO' },
+  { label: 'JPMorgan · JPM', symbol: 'JPM' },
+  { label: 'Berkshire Hathaway · BRK-B', symbol: 'BRK-B' },
 ];
 
 function HistoryChart({ result }) {
@@ -39,7 +45,7 @@ function PriceChart({ points, symbol }) {
   const span = max - min || 1;
   const line = values.map((value, index) => `${24 + index / Math.max(1, values.length - 1) * 752},${112 - (value - min) / span * 86}`).join(' ');
   const rising = values.at(-1) >= values[0];
-  return <div className="live-price-chart"><div className="live-chart-heading"><b>{symbol === 'S&P 500' ? 'S&P 500 ETF proxy' : symbol} · price today</b><span>{money(min)} – {money(max)}</span></div><svg viewBox="0 0 800 140" role="img" aria-label={`${symbol} intraday prices`}><defs><linearGradient id="marketPriceFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor={rising ? 'var(--theme-accent, #37845c)' : '#c56b5a'} stopOpacity=".2"/><stop offset="1" stopColor={rising ? 'var(--theme-accent, #37845c)' : '#c56b5a'} stopOpacity="0"/></linearGradient></defs>{[0,1,2].map(row => <line key={row} x1="24" x2="776" y1={24 + row * 42} y2={24 + row * 42} className="replay-grid"/>)}<polygon points={`24,116 ${line} 776,116`} fill="url(#marketPriceFill)"/><polyline points={line} className={rising ? 'live-price-line' : 'live-price-line down'}/></svg><div className="live-chart-range"><span>Market open</span><span>Latest update</span></div></div>;
+  return <div className="live-price-chart"><div className="live-chart-heading"><b>{symbol === 'S&P 500' ? 'S&P 500 ETF proxy' : symbol} · price history</b><span>{money(min)} – {money(max)}</span></div><svg viewBox="0 0 800 140" role="img" aria-label={`${symbol} historical prices`}><defs><linearGradient id="marketPriceFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor={rising ? 'var(--theme-accent, #37845c)' : '#c56b5a'} stopOpacity=".2"/><stop offset="1" stopColor={rising ? 'var(--theme-accent, #37845c)' : '#c56b5a'} stopOpacity="0"/></linearGradient></defs>{[0,1,2].map(row => <line key={row} x1="24" x2="776" y1={24 + row * 42} y2={24 + row * 42} className="replay-grid"/>)}<polygon points={`24,116 ${line} 776,116`} fill="url(#marketPriceFill)"/><polyline points={line} className={rising ? 'live-price-line' : 'live-price-line down'}/></svg><div className="live-chart-range"><span>{points[0]?.date ? new Date(points[0].date).toLocaleDateString() : 'Start'}</span><span>{points.at(-1)?.date ? new Date(points.at(-1).date).toLocaleDateString() : 'Latest update'}</span></div></div>;
 }
 
 export default function MarketReplay({ safeSurplus, reserve, rails, persona = 'Adult', initialSymbol = 'S&P 500', onSymbolChange }) {
@@ -63,11 +69,12 @@ export default function MarketReplay({ safeSurplus, reserve, rails, persona = 'A
       setError('');
       setResult(null);
       try {
-        const response = await fetch(`/api/market?symbols=SPY,AAPL,MSFT,TSLA&range=${range}`, { signal: controller.signal });
+        const symbols = options.map(item => item.symbol === 'S&P 500' ? 'SPY:NYSE' : `${item.symbol}:NYSE`).join(',');
+        const response = await fetch(`/api/market?symbols=${symbols}&range=${range}`, { signal: controller.signal });
         const data = await response.json();
         if (!response.ok || !Array.isArray(data.quotes)) throw new Error(data.error || 'Stock prices are unavailable.');
         setWatchlist(data.quotes);
-        const selected = symbol === 'S&P 500' ? 'SPY' : symbol;
+        const selected = symbol === 'S&P 500' ? 'SPY:NYSE' : `${symbol}:NYSE`;
         const quote = data.quotes.find(item => item.symbol === selected);
         if (!quote) throw new Error(`No prices were returned for ${symbol}.`);
         setHistory(quote);
@@ -162,12 +169,12 @@ export default function MarketReplay({ safeSurplus, reserve, rails, persona = 'A
 
   return <section className="panel market-panel" aria-labelledby="market-title">
     <div className="market-head"><div><div className="eyebrow">MARKET WATCH <span className="market-real-pill"><i/> LIVE INTRADAY · MAY BE DELAYED</span></div><h2 id="market-title">{persona === 'Kid' ? 'See what stock prices are doing.' : 'Explore real market prices.'}</h2><p>{persona === 'Kid' ? 'Compare companies, follow today’s chart, and explore an investment.' : 'Compare current prices and see how an investment would have moved over time.'}</p></div><button type="button" className="market-refresh" onClick={fetchFresh} disabled={loading} aria-label="Refresh market prices"><RefreshCw size={15}/></button></div>
-    <div className="market-watch-grid" aria-label="Stock price comparison">{watchlist.map(quote => { const option = options.find(item => (item.symbol === 'S&P 500' ? 'SPY' : item.symbol) === quote.symbol); const cardLabel = persona === 'Kid' && quote.symbol === 'SPY' ? 'S&P 500 companies' : option.label; const last = quote.points.at(-1)?.close; const prior = range === '1d' ? quote.previousClose : quote.points.at(-2)?.close; const change = last && prior ? (last / prior - 1) * 100 : null; const selected = (symbol === 'S&P 500' ? 'SPY' : symbol) === quote.symbol; return <button type="button" key={quote.symbol} className={`market-watch-card ${selected ? 'selected' : ''}`} onClick={() => { setSymbol(option.symbol); onSymbolChange?.(option.symbol); }} aria-pressed={selected}><span>{cardLabel}</span><b>{last ? money(last) : '—'}</b><small className={change === null ? '' : change >= 0 ? 'market-up' : 'market-down'}>{change === null ? 'Change unavailable' : `${change >= 0 ? '+' : ''}${change.toFixed(2)}% ${range === '1d' ? 'today' : 'last day'}`}</small></button>; })}</div>
-    <div className="market-controls"><label><span>CHART RANGE</span><div className="select-wrap"><select value={range} onChange={event => setRange(event.target.value)} aria-label="Price history range"><option value="1d">Today · refreshes each minute</option><option value="6mo">6 months</option><option value="1y">1 year</option><option value="5y">5 years</option></select><ChevronDown size={15}/></div></label></div>
+    <div className="market-watch-grid" aria-label="Stock price comparison">{watchlist.map(quote => { const option = options.find(item => (item.symbol === 'S&P 500' ? 'SPY:NYSE' : `${item.symbol}:NYSE`) === quote.symbol); if (!option) return null; const cardLabel = persona === 'Kid' && quote.symbol === 'SPY:NYSE' ? 'S&P 500 companies' : option.label; const last = quote.points.at(-1)?.close; const prior = range === '1d' ? quote.previousClose : quote.points.at(-2)?.close; const change = last && prior ? (last / prior - 1) * 100 : null; const selected = (symbol === 'S&P 500' ? 'SPY:NYSE' : `${symbol}:NYSE`) === quote.symbol; return <button type="button" key={quote.symbol} className={`market-watch-card ${selected ? 'selected' : ''}`} onClick={() => { setSymbol(option.symbol); onSymbolChange?.(option.symbol); }} aria-pressed={selected}><span>{cardLabel}</span><b>{last ? money(last) : '—'}</b><small className={change === null ? '' : change >= 0 ? 'market-up' : 'market-down'}>{change === null ? 'Change unavailable' : `${change >= 0 ? '+' : ''}${change.toFixed(2)}% ${range === '1d' ? 'today' : 'last day'}`}</small></button>; })}</div>
+    <div className="market-controls"><label><span>CHART RANGE</span><div className="select-wrap"><select value={range} onChange={event => setRange(event.target.value)} aria-label="Price history range"><option value="1d">Today · refreshes each minute</option><option value="5d">5 days</option><option value="1mo">1 month</option><option value="6mo">6 months</option><option value="1y">1 year</option><option value="5y">5 years</option></select><ChevronDown size={15}/></div></label></div>
     {loading && <div className="market-loading" role="status"><span className="market-loader-orb"><Activity size={18}/></span><div><b>Loading verified price history</b><small>Fetching daily adjusted closes for {symbol}…</small></div><span className="market-loading-bar"/></div>}
     {!loading && error && <div className="market-error" role="alert"><AlertTriangle size={17}/><span><b>Price history not loaded</b><small>{error} Check your connection and retry.</small></span><button onClick={fetchFresh}>Retry</button></div>}
     {!loading && history && <>
-      <div className="market-data-meta"><span><i className="data-live-dot"/> {range === '1d' ? `${history.points.length} intraday price updates · refreshes every minute` : `${history.points.length} daily observations`}</span><span>{history.displaySymbol} · {history.source} · {history.currency} {range === '1d' ? 'prices' : 'adjusted close'}</span></div>
+      <div className="market-data-meta"><span><i className="data-live-dot"/> {history.points.length} {range === '1d' || range === '5d' || range === '1mo' ? 'intraday price bars' : 'daily observations'} · refreshes each minute</span><span>{history.displayName || history.symbol} · {history.source} · {history.currency} · fetched {new Date(history.fetchedAt || Date.now()).toLocaleTimeString()}</span></div>
       {history.points.length > 1 && <PriceChart points={history.points} symbol={symbol}/>}
       <p className="market-chart-note">{persona === 'Kid' ? 'This shows prices from earlier today. It cannot tell us what the price will do next.' : 'This chart shows past prices. It cannot tell us when a stock will rise or fall next.'}</p>
       <div className="market-detail-grid"><div><span>Opening price</span><b>{history.open ? money(history.open) : '—'}</b></div><div><span>Day high</span><b>{history.dayHigh ? money(history.dayHigh) : '—'}</b></div><div><span>Day low</span><b>{history.dayLow ? money(history.dayLow) : '—'}</b></div><div><span>{persona === 'Kid' ? 'Price at yesterday’s close' : 'Previous close'}</span><b>{history.previousClose ? money(history.previousClose) : '—'}</b></div><div><span>{persona === 'Kid' ? 'Shares traded today' : 'Volume today'}</span><b>{history.volume ? new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(history.volume) : '—'}</b></div><div><span>{persona === 'Kid' ? 'Lowest and highest this year' : '52-week range'}</span><b>{history.yearLow && history.yearHigh ? `${money(history.yearLow)} – ${money(history.yearHigh)}` : '—'}</b></div></div>
