@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Activity, ArrowDownLeft, ArrowUpRight, Bell, BookOpenCheck, CalendarDays, Check, ChevronDown, CircleDollarSign, CircleHelp, Clock3, CreditCard, Landmark, LockKeyhole, ShieldCheck, Sparkles, TrendingDown, TrendingUp, Wallet, Wrench, X, LayoutDashboard, BriefcaseBusiness, Sun, Moon } from 'lucide-react';
 import { buildForecast, crashScenarios, evaluateSimulatedTrade, getSafeSurplus, simulateAutoInvest } from './finance';
@@ -16,6 +16,7 @@ import './portfolio.css';
 import './onboarding.css';
 import './workspace.css';
 import './what-if.css';
+import './copilot-chat.css';
 
 const personas = ['Kid', 'Teen', 'Adult'];
 const DEMO_CASH_EVENTS = Object.freeze([
@@ -253,9 +254,10 @@ function App() {
   const [contribution, setContribution] = useState('250');
   const [crash, setCrash] = useState('');
   const [question, setQuestion] = useState('');
-  const [answer, setAnswer] = useState('Your 30-day plan is steady. Essentials stay covered in the forecast, leaving room to build a small, repeatable investing habit. Start with a schedule you can comfortably pause.');
+  const [copilotMessages, setCopilotMessages] = useState([{ id: 'welcome', role: 'assistant', text: `Hi${accountProfile?.firstName ? ` ${accountProfile.firstName}` : ''}! Ask me about your plan, savings, or a decision. I’ll use the numbers in this practice account.` }]);
   const [aiStatus, setAiStatus] = useState('demo');
   const [aiLoading, setAiLoading] = useState(false);
+  const copilotEndRef = useRef(null);
   const [plaidAccessToken, setPlaidAccessToken] = useState('');
   const [linkedAccount, setLinkedAccount] = useState(null);
   const [linkedInstitution, setLinkedInstitution] = useState('');
@@ -263,6 +265,7 @@ function App() {
   const [plaidMessage, setPlaidMessage] = useState('');
   const [sandboxTransfers, setSandboxTransfers] = useState([]);
   const reserve = persona === 'Kid' ? 100 : persona === 'Teen' ? 750 : 1200;
+  useEffect(() => { copilotEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }); }, [copilotMessages, aiLoading]);
   const cashFloor = persona === 'Kid' ? 0 : persona === 'Teen' ? 100 : 300;
   const accountBalance = linkedAccount?.available ?? linkedAccount?.current ?? Number(paperAccount.bankCash || 0);
   const whatIfCash = linkedAccount?.available ?? linkedAccount?.current ?? Number(paperAccount.bankCash || 0);
@@ -484,28 +487,36 @@ function App() {
   async function askCopilot(prompt = question) {
     const text = prompt.trim();
     if (!text || aiLoading) return;
-    setQuestion(text);
+    const history = copilotMessages.slice(-8).map(message => ({ role: message.role, text: message.text.slice(0, 500) }));
+    setCopilotMessages(messages => [...messages, { id: `user-${Date.now()}`, role: 'user', text }]);
+    setQuestion('');
     setAiLoading(true);
     try {
-      const response = await fetch('/api/copilot', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: text, persona, projectedLow: lowestBalance, safeSurplus, protectedReserve: reserve, upcomingBills: bills, expectedIncome: income, recurringMonthly: recurringTotal, investmentVerdict: decision.verdict, investmentReason: decision.reason }) });
+      const response = await fetch('/api/copilot', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: text, history, persona, projectedLow: lowestBalance, safeSurplus, protectedReserve: reserve, upcomingBills: bills, expectedIncome: income, recurringMonthly: recurringTotal, investmentVerdict: decision.verdict, investmentReason: decision.reason }) });
       const data = await response.json();
       if (!response.ok || !data.answer) throw new Error('AI endpoint unavailable');
-      setAnswer(data.answer);
-      setAiStatus('live');
+      const source = data.source === 'fallback' ? 'fallback' : 'ai';
+      setCopilotMessages(messages => [...messages, { id: `assistant-${Date.now()}`, role: 'assistant', text: data.answer, source }]);
+      setAiStatus(source === 'ai' ? 'live' : 'demo');
     } catch {
       setAiStatus('demo');
       const isPurchase = /buy|purchase|macbook|laptop/i.test(text);
       const isInvest = /invest|stock|trade/i.test(text);
-      setAnswer(isPurchase
+      const fallback = isPurchase
         ? `In this sample forecast, your lowest projected balance is ${money(lowestBalance)} after planned bills and income. The essentials reserve is protected at ${money(reserve)}. Try the purchase preview to see its exact effect on the 30-day curve.`
         : isInvest
           ? `${decision.verdict === 'pass' ? 'The current order passes' : 'The current order is blocked'} under the deterministic rules engine: ${decision.reason} The AI can explain that result, but it cannot change it.`
-          : `Your plan has ${money(safeSurplus)} of projected safe surplus after a ${money(reserve)} reserve. ${cancelled.length ? `The ${cancelled.join(', ')} cancellation simulation is reflected in the forecast.` : 'Try the recurring-charge controls to see how small changes affect the forecast.'} This is sample-data analysis.`);
+          : `Your plan has ${money(safeSurplus)} of projected safe surplus after a ${money(reserve)} reserve. ${cancelled.length ? `The ${cancelled.join(', ')} cancellation simulation is reflected in the forecast.` : 'Try the recurring-charge controls to see how small changes affect the forecast.'} This is sample-data analysis.`;
+      setCopilotMessages(messages => [...messages, { id: `assistant-${Date.now()}`, role: 'assistant', text: fallback, source: 'fallback' }]);
     } finally {
       setAiLoading(false);
     }
   }
 
+  function startNewCopilotChat() {
+    setCopilotMessages([{ id: `welcome-${Date.now()}`, role: 'assistant', text: `Hi${accountProfile?.firstName ? ` ${accountProfile.firstName}` : ''}! Ask me about your plan, savings, or a decision. I’ll use the numbers in this practice account.` }]);
+    setQuestion('');
+  }
   const pages = [
     { label: 'Wealth Manager', page: 'Wealth', icon: CircleDollarSign },
     { label: 'Overview', page: 'Overview', icon: LayoutDashboard },
@@ -565,7 +576,7 @@ function App() {
         <option value="30">Monthly</option>
       </select><ChevronDown size={15}/></div></label></div><div className="automation-context"><span>Cash floor</span><b>{money(cashFloor)}</b><span>Protected essentials</span><b>{money(reserve)}</b></div><PaperTradeAgent key={`${contribution}-${cadence}-${paperAsset}-${rails}-${safeSurplus}-${reserve}`} plan={autoPlan} asset={paperAsset} cadence={Number(cadence) === 7 ? 'weekly' : Number(cadence) === 14 ? 'biweekly' : 'monthly'} rails={rails} forecast={forecast} safeSurplus={safeSurplus} reserve={reserve} bills={bills} income={income} recurringMonthly={recurringTotal} persona={persona} onAiStatus={setAiStatus}/><div className="rails-row"><div><b>Deterministic safety rails</b><small>{rails ? 'Rules ON · reserve and cash-floor checks enforced' : 'Rules OFF · all paper orders are blocked'}</small></div><button className={rails ? 'toggle on' : 'toggle'} onClick={() => { setRails(value => !value); setTradePreview(false); }} aria-label="Toggle deterministic safety rails" aria-pressed={rails}><i/></button></div>
       </section>
-      <section className="panel copilot-panel"><div className="section-title"><div className="section-icon violet-icon"><Sparkles size={18}/></div><div><div className="eyebrow">VELORA COPILOT</div><h2>Make the numbers make sense.</h2></div><span className={`ai-mode ${aiStatus}`}>{aiStatus === 'live' ? 'AI LIVE' : 'SAMPLE INSIGHT'}</span></div><p className="section-description">Ask a question about your plan. AI explains the picture; it never changes a safety verdict.</p><div className="copilot-message"><span className="copilot-avatar"><Sparkles size={15}/></span><div><div className="message-meta">{aiStatus==='live'?'AI · grounded in this forecast':'Velora sample insight'}<span>JUST NOW</span></div><p>{answer}</p></div></div><form className="copilot-form" onSubmit={event => {event.preventDefault();askCopilot()}}><input value={question} onChange={event => setQuestion(event.target.value)} placeholder="Ask about a purchase, bill, or investing plan…" aria-label="Ask Velora Copilot"/><button type="submit" disabled={aiLoading || !question.trim()}>{aiLoading?'Thinking…':'Ask'} <ArrowUpRight size={15}/></button></form><div className="prompt-chips"><span>Try</span><button onClick={() => askCopilot('Can I afford a $1,200 laptop?')}>Can I afford a laptop?</button><button onClick={() => askCopilot('How much could I invest safely?')}>Explain my safe surplus</button></div><div className="ai-boundary"><LockKeyhole size={13}/> Explanations are informational. Rules Engine owns every PASS / BLOCK result.</div></section>
+      <section className="panel copilot-panel"><div className="section-title"><div className="section-icon violet-icon"><Sparkles size={18}/></div><div><div className="eyebrow">VELORA COPILOT</div><h2>Ask away.</h2></div><span className={`ai-mode ${aiStatus}`}>{aiStatus === 'live' ? 'GEMINI LIVE' : 'LOCAL HELPER'}</span><button type="button" className="copilot-new-chat" onClick={startNewCopilotChat}>New chat</button></div><p className="section-description">Chat about your plan and money choices. Velora uses your practice account and never changes a safety decision.</p><div className="copilot-chat" role="log" aria-label="Conversation with Velora Copilot" aria-live="polite">{copilotMessages.map(message => <div className={`copilot-chat-row ${message.role}`} key={message.id}>{message.role === 'assistant' && <span className="copilot-avatar"><Sparkles size={15}/></span>}<div className="copilot-chat-bubble"><small>{message.role === 'user' ? 'YOU' : message.source === 'fallback' ? 'VELORA · LOCAL HELPER' : 'VELORA'}</small><p>{message.text}</p></div></div>)}{aiLoading && <div className="copilot-chat-row assistant"><span className="copilot-avatar"><Sparkles size={15}/></span><div className="copilot-chat-bubble typing" role="status"><small>VELORA IS THINKING</small><p><i/><i/><i/></p></div></div>}<div ref={copilotEndRef}/></div><form className="copilot-form" onSubmit={event => {event.preventDefault();askCopilot()}}><input value={question} onChange={event => setQuestion(event.target.value)} placeholder="Message Velora…" aria-label="Message Velora Copilot"/><button type="submit" disabled={aiLoading || !question.trim()} aria-label="Send message">{aiLoading?'Thinking…':'Send'} <ArrowUpRight size={15}/></button></form><div className="prompt-chips"><span>Try</span><button onClick={() => askCopilot('Can I afford a $1,200 laptop?')} disabled={aiLoading}>Can I afford a laptop?</button><button onClick={() => askCopilot('How much could I save safely?')} disabled={aiLoading}>Explain my safe surplus</button></div><div className="ai-boundary"><LockKeyhole size={13}/> Educational chat only · no trades or money transfers.</div></section>
       <section className="panel decision-panel"><div className="section-title"><div className="section-icon coral-icon"><Wallet size={18}/></div><div><div className="eyebrow">WHAT-IF PLANNER</div><h2>Try a decision first.</h2></div></div><p className="section-description">See what a purchase could change across your whole month.</p><form className="purchase-input" onSubmit={event => {event.preventDefault();setPurchase(Number(purchaseInput.replace(/[^0-9.]/g,''))||0)}}><span>$</span><input value={purchaseInput} onChange={event => setPurchaseInput(event.target.value)} placeholder="1,200 laptop" aria-label="Purchase amount"/><button type="submit">Preview <span>→</span></button></form><div className="quick-picks"><span>Try</span><button onClick={() => {setPurchaseInput('250');setPurchase(250)}}>$250 weekend trip</button><button onClick={() => {setPurchaseInput('1,200');setPurchase(1200)}}>$1,200 laptop</button>{purchase>0&&<button onClick={() => {setPurchase(0);setPurchaseInput('')}}>Clear</button>}</div><div className="impact-box"><div className="impact-heading"><span className="impact-dot"/> LIVE SCENARIO</div><div className="impact-row"><span>Purchase impact</span><b>−{money(purchase)}</b></div><div className="impact-row"><span>Projected lowest balance</span><b className={lowestBalance<reserve?'coral-text':''}>{money(lowestBalance)}</b></div><div className="impact-message"><ShieldCheck size={14}/>{lowestBalance>=reserve?`Your ${money(reserve)} reserve remains protected.`:'This scenario dips into the protected reserve.'}</div></div><div className="ai-footnote"><Activity size={13}/> Forecast recalculates instantly · sample data only</div></section>
       <section className="panel subscriptions-panel"><div className="section-title"><div className="section-icon coral-icon"><CreditCard size={18}/></div><div><div className="eyebrow">RECURRING EXPENSES</div><h2>Your recurring charges.</h2></div></div>{recurringTotal > 0 ? <><div className="subscription-total"><span>Monthly total</span><b>{money(recurringTotal,2)}<small>/mo</small></b></div><div className="subscription-list">{subscriptions.map(item => {const isCancelled=cancelled.includes(item.name);return <div className={isCancelled?'subscription canceled':'subscription'} key={item.name}><div className="service-icon" style={{'--service':item.color}}>{item.icon}</div><div className="service-name"><b>{item.name}</b><small>{isCancelled?'Cancellation simulated':item.detail}</small></div><div className="service-cost">{money(item.amount,2)}<small>/mo</small></div><button className={isCancelled?'toggle on':'toggle'} onClick={() => setCancelled(isCancelled ? cancelled.filter(name => name !== item.name) : [...cancelled, item.name])} aria-label={`${isCancelled?'Restore':'Simulate cancellation'} ${item.name}`}><i/></button></div>})}</div></> : <div className="subscriptions-empty"><CreditCard size={18}/><span><b>No recurring charges added</b><small>Your account is empty by design. Add expected bills to the payment calendar when you’re ready.</small></span></div>}<div className="nudge"><div className="nudge-spark"><Sparkles size={15}/></div><div><span className="nudge-label">PLAN INSIGHT</span><p>{recurringTotal ? 'Recurring charges are planning examples; changing a toggle never modifies a service account.' : 'Once you add recurring items, the forecast and cash-reserve checks will update automatically.'}</p></div></div></section>
       </div>}
