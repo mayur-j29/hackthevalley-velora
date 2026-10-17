@@ -209,6 +209,17 @@ export function createSimulation(options = {}) {
     regime = 'crash';
     const snapshot = { date: isoDate(date), regime, prices: { ...prices } };
     for (const ticker of ['AAPL', 'NVDA', 'TSLA', 'MSFT', 'AMZN', 'GOOGL', 'SPY', 'QQQ', 'VTI']) prices[ticker] = roundMoney(prices[ticker] * (ticker === 'TSLA' || ticker === 'NVDA' ? 0.82 : 0.88));
+    for (const ticker of Object.keys(ASSETS)) {
+      const close = prices[ticker];
+      const open = snapshot.prices[ticker];
+      marketHistory[ticker].push({ date: isoDate(date), close: roundMoney(close), open: roundMoney(open), high: roundMoney(Math.max(open, close)), low: roundMoney(Math.min(open, close)) });
+      marketHistory[ticker] = marketHistory[ticker].slice(-730);
+    }
+    for (const account of Object.values(accounts)) {
+      const latest = account.history.at(-1);
+      if (latest?.date === isoDate(date)) latest.value = roundMoney(portfolioValue(account));
+      else account.history.push({ date: isoDate(date), value: roundMoney(portfolioValue(account)) });
+    }
     const crashEvent = { id: `demo-crash-${isoDate(date)}`, date: isoDate(date), headline: 'Demo scenario: a sudden market crash sends growth shares lower', tickers: Object.keys(ASSETS).filter(ticker => ticker !== 'BND'), impact: -0.12 };
     events.push(crashEvent);
     return { before: snapshot, after: getPrices(), event: clone(crashEvent) };
