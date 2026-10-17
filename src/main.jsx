@@ -17,7 +17,6 @@ import './workspace.css';
 import './what-if.css';
 
 const personas = ['Kid', 'Teen', 'Adult'];
-const DEMO_BANK = Object.freeze({ name: 'Everyday Chequing', institution: 'Velora Demo Bank', subtype: 'checking', mask: '4242', available: 25000, current: 25000, currency: 'CAD', accountId: 'velora-demo-checking' });
 const DEMO_CASH_EVENTS = Object.freeze([
   ...Array.from({ length: 30 }, (_, index) => ({ day: index + 1, title: 'Sample work earnings', amount: 500, kind: 'income' })),
   { day: 2, title: 'Rent', amount: -1450, kind: 'bill' },
@@ -59,6 +58,10 @@ function readPalette() {
     if (themeOptions.some(option => option.id === saved)) return saved;
     return window.localStorage.getItem('velora-theme') === 'dark' ? 'green-dark' : 'green-light';
   } catch { return 'green-light'; }
+}
+
+function createEmptyPaperAccount() {
+  return { ...createInitialPaperAccount(), bankCash: 0, cash: 0, budget: 0, earningsStartAt: null };
 }
 
 function ThemePicker({ value, onChange }) {
@@ -346,7 +349,7 @@ function App() {
     window.localStorage.setItem('velora-custom-events', '[]');
     window.localStorage.setItem('velora-debt-payments', JSON.stringify({ card: 0, student: 0, mortgage: 0 }));
     window.localStorage.removeItem('velora-auto-invest');
-    const initialPaperAccount = createInitialPaperAccount();
+    const initialPaperAccount = createEmptyPaperAccount();
     savePaperAccount(initialPaperAccount);
     setPaperAccount(initialPaperAccount);
     window.localStorage.removeItem('velora-onboarding-choice');
@@ -377,7 +380,7 @@ function App() {
   function createNewAccount() {
     if (!window.confirm('Create a new account? This permanently replaces this browser’s local profile, paper holdings, order history, and plan settings.')) return;
     for (const key of ['velora-account-profile', 'velora-paper-portfolio', 'velora-custom-events', 'velora-debt-payments', 'velora-auto-invest', 'velora-session-ended']) window.localStorage.removeItem(key);
-    const initialPaperAccount = createInitialPaperAccount();
+    const initialPaperAccount = createEmptyPaperAccount();
     savePaperAccount(initialPaperAccount);
     setPaperAccount(initialPaperAccount);
     setAccountProfile(null);
@@ -540,7 +543,7 @@ function App() {
       {activePage === 'WhatIf' && <WhatIfCoach persona={persona} cash={whatIfCash - purchase} income={income} bills={bills} safeSurplus={safeSurplus} projectedLow={lowestBalance} reserve={reserve}/>}
       {activePage === 'Overview' && <>
       <section className="summary-grid" aria-label={`${persona} account overview`}>
-        <article className="summary-card balance-card"><div className="card-topline"><span>{persona === 'Kid' ? 'Pretend cash' : linkedAccount ? 'Sandbox bank balance' : 'Practice cash'}</span><CircleHelp size={15}/></div><div className="balance-amount">{money(accountBalance-purchase,2)}</div><div className="balance-foot"><span className="up-label"><TrendingUp size={14}/> {linkedAccount ? 'Plaid Sandbox' : 'Velora practice account'}</span><span>{linkedAccount ? `${linkedAccount.currency} · •••• ${linkedAccount.mask}` : `CAD · •••• ${DEMO_BANK.mask}`}</span></div><div className="balance-spark"><svg viewBox="0 0 140 42"><path d="M1 32 C18 26 18 33 33 25 S55 28 65 17 S84 23 98 12 S116 19 139 3" fill="none" stroke="#70b69a" strokeWidth="2"/></svg></div></article>
+        <article className="summary-card balance-card"><div className="card-topline"><span>{persona === 'Kid' ? 'Pretend cash' : linkedAccount ? 'Sandbox bank balance' : 'Practice cash'}</span><CircleHelp size={15}/></div><div className="balance-amount">{money(accountBalance-purchase,2)}</div><div className="balance-foot"><span className="up-label"><TrendingUp size={14}/> {linkedAccount ? 'Plaid Sandbox' : 'Velora practice account'}</span><span>{linkedAccount ? `${linkedAccount.currency} · •••• ${linkedAccount.mask}` : 'CAD · simulated'}</span></div><div className="balance-spark"><svg viewBox="0 0 140 42"><path d="M1 32 C18 26 18 33 33 25 S55 28 65 17 S84 23 98 12 S116 19 139 3" fill="none" stroke="#70b69a" strokeWidth="2"/></svg></div></article>
         <article className="summary-card"><div className="card-topline"><span>{persona === 'Kid' ? 'Money coming in' : accountProfile?.demo ? 'Sample work · 30 days' : 'Income · 30 days'}</span><span className="metric-icon income-icon"><ArrowDownLeft size={17}/></span></div><div className="metric-amount">{money(income,0)}</div><div className="metric-foot"><span className="metric-note"><i className="small-green-dot"/> {persona === 'Kid' ? 'Planned paydays' : accountProfile?.demo ? '$500 added each day' : 'Income included'}</span></div></article>
         <article className="summary-card"><div className="card-topline"><span>{persona === 'Kid' ? 'Bills to pay' : 'Planned outflows'}</span><span className="metric-icon bill-icon"><ArrowUpRight size={17}/></span></div><div className="metric-amount">{money(bills,0)}</div><div className="metric-foot"><span className="metric-note">{persona === 'Kid' ? 'Planned bills' : 'Scheduled bills included'}</span></div></article>
         <article className="summary-card"><div className="card-topline"><span>{persona === 'Kid' ? 'Left after bills' : 'Safe to explore'}</span><span className="metric-icon safe-icon"><ShieldCheck size={17}/></span></div><div className="metric-amount">{money(safeSurplus,0)}</div><div className="metric-foot"><span className="metric-note">{persona === 'Kid' ? 'Keepsake money protected' : `After a ${money(reserve)} cash buffer`}</span></div></article>
@@ -563,7 +566,7 @@ function App() {
       <section className="panel subscriptions-panel"><div className="section-title"><div className="section-icon coral-icon"><CreditCard size={18}/></div><div><div className="eyebrow">RECURRING EXPENSES</div><h2>Your recurring charges.</h2></div></div>{recurringTotal > 0 ? <><div className="subscription-total"><span>Monthly total</span><b>{money(recurringTotal,2)}<small>/mo</small></b></div><div className="subscription-list">{subscriptions.map(item => {const isCancelled=cancelled.includes(item.name);return <div className={isCancelled?'subscription canceled':'subscription'} key={item.name}><div className="service-icon" style={{'--service':item.color}}>{item.icon}</div><div className="service-name"><b>{item.name}</b><small>{isCancelled?'Cancellation simulated':item.detail}</small></div><div className="service-cost">{money(item.amount,2)}<small>/mo</small></div><button className={isCancelled?'toggle on':'toggle'} onClick={() => setCancelled(isCancelled ? cancelled.filter(name => name !== item.name) : [...cancelled, item.name])} aria-label={`${isCancelled?'Restore':'Simulate cancellation'} ${item.name}`}><i/></button></div>})}</div></> : <div className="subscriptions-empty"><CreditCard size={18}/><span><b>No recurring charges added</b><small>Your account is empty by design. Add expected bills to the payment calendar when you’re ready.</small></span></div>}<div className="nudge"><div className="nudge-spark"><Sparkles size={15}/></div><div><span className="nudge-label">PLAN INSIGHT</span><p>{recurringTotal ? 'Recurring charges are planning examples; changing a toggle never modifies a service account.' : 'Once you add recurring items, the forecast and cash-reserve checks will update automatically.'}</p></div></div></section>
       </div>}
       </div>
-      <footer className="page-footer"><span><LockKeyhole size={13}/> {activePage === 'Wealth' ? 'Simulated portfolio · saved in this browser' : `Demo bank · sample balance ${money(paperAccount.bankCash)}`}</span><span>Practice orders only · no real funds move</span><span className="footer-right">Built for clearer decisions</span></footer>
+      <footer className="page-footer"><span><LockKeyhole size={13}/> {activePage === 'Wealth' ? 'Simulated portfolio · saved in this browser' : `Practice cash · ${money(paperAccount.bankCash)}`}</span><span>Practice orders only · no real funds move</span><span className="footer-right">Built for clearer decisions</span></footer>
     </main>
     <div className="disclaimer"><span><ShieldCheck size={15}/> <b>Paper investing only.</b> This educational simulation cannot place real trades, move money, or provide formal financial advice.</span></div>
     </div>
