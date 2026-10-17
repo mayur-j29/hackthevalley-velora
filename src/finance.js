@@ -1,30 +1,138 @@
-export const startingBalance = 4820.46;
+export const startingBalance = 0;
 export const essentialReserve = 1200;
 
-export const scheduledEvents = [
-  { day: 2, title: 'Phone bill', amount: -68, kind: 'bill' },
-  { day: 5, title: 'Spotify', amount: -12.99, kind: 'bill', subscription: 'Spotify' },
-  { day: 8, title: 'Payday', amount: 2450, kind: 'income' },
-  { day: 12, title: 'Groceries', amount: -126, kind: 'bill' },
-  { day: 16, title: 'Internet', amount: -74, kind: 'bill' },
-  { day: 20, title: 'GoodLife Fitness', amount: -39.99, kind: 'bill', subscription: 'GoodLife Fitness' },
-  { day: 22, title: 'Netflix', amount: -16.99, kind: 'bill', subscription: 'Netflix' },
-  { day: 23, title: 'Payday', amount: 2450, kind: 'income' },
-  { day: 26, title: 'Rent', amount: -1850, kind: 'bill' },
-  { day: 29, title: 'Car insurance', amount: -142, kind: 'bill' },
-];
+export const scheduledEvents = [];
 const startDate = new Date();
 startDate.setHours(0, 0, 0, 0);
 
-export function buildForecast({ purchase = 0, cancelled = [], days = 30, balance: accountBalance = startingBalance } = {}) {
+export function buildForecast({ purchase = 0, cancelled = [], days = 30, balance: accountBalance = startingBalance, events = scheduledEvents } = {}) {
   let balance = accountBalance - purchase;
   return Array.from({ length: days + 1 }, (_, day) => {
-    const events = scheduledEvents.filter(event => event.day === day && !cancelled.includes(event.subscription));
-    events.forEach(event => { balance += event.amount; });
+    const dayEvents = events.filter(event => event.day === day && !cancelled.includes(event.subscription));
+    dayEvents.forEach(event => { balance += event.amount; });
     const date = new Date(startDate);
     date.setDate(date.getDate() + day);
-    return { day, date, value: balance, events };
+    return { day, date, value: balance, events: dayEvents };
   });
+}
+
+export function calculateDebtPayoff({ balance, apr, payment, extraPayment = 0 }) {
+  let remaining = Number(balance);
+  const annualRate = Number(apr);
+  const monthlyPayment = Number(payment) + Number(extraPayment);
+  if (!Number.isFinite(remaining) || remaining < 0 || !Number.isFinite(annualRate) || annualRate < 0 || !Number.isFinite(monthlyPayment) || monthlyPayment < 0) return { valid: false, months: null, totalInterest: null, firstMonthInterest: null, reason: 'Enter a valid balance, APR, and non-negative payment.' };
+  if (remaining === 0) return { valid: true, months: 0, totalInterest: 0, firstMonthInterest: 0, reason: 'This balance is already paid off.' };
+  if (monthlyPayment <= 0) return { valid: false, months: null, totalInterest: null, firstMonthInterest: null, reason: 'Enter a positive monthly payment for an active balance.' };
+
+  const monthlyRate = annualRate / 1200;
+  const firstMonthInterest = remaining * monthlyRate;
+  if (monthlyPayment <= firstMonthInterest) {
+    return { valid: false, months: null, totalInterest: null, firstMonthInterest, reason: 'Payment does not cover the first month of interest.' };
+  }
+
+  let totalInterest = 0;
+  let months = 0;
+  while (remaining > 0 && months < 1200) {
+    const interest = remaining * monthlyRate;
+    totalInterest += interest;
+    remaining = Math.max(0, remaining + interest - monthlyPayment);
+    months += 1;
+  }
+  if (remaining > 0) return { valid: false, months: null, totalInterest: null, firstMonthInterest, reason: 'This payment schedule exceeds the 100-year simulation limit.' };
+  return { valid: true, months, totalInterest, firstMonthInterest, reason: 'Estimate assumes a fixed APR and payment with monthly compounding.' };
+}
+
+export function simulateHistoricalInvestment({ amount, safeSurplus, railsEnabled, points }) {
+  const value = Number(amount);
+  if (!railsEnabled) return { verdict: 'blocked', reason: 'Turn safety rails on to simulate an investment. Rails-off mode never approves a paper trade.' };
+  if (!Number.isFinite(value) || value <= 0) return { verdict: 'blocked', reason: 'Enter a paper amount greater than $0.' };
+  if (!Number.isFinite(safeSurplus) || safeSurplus < 0 || value > safeSurplus) {
+    return { verdict: 'blocked', reason: `Amount must fit within the current safe surplus of $${Math.max(0, Number(safeSurplus) || 0).toLocaleString()}.` };
+  }
+  if (!Array.isArray(points) || points.length < 2) return { verdict: 'unavailable', reason: 'Load at least two historical adjusted closing prices first.' };
+
+  const validPoints = points.filter(point => Number.isFinite(Number(point.close)) && Number(point.close) > 0);
+  if (validPoints.length < 2) return { verdict: 'unavailable', reason: 'The selected history contains too few valid prices.' };
+  const first = validPoints[0];
+  const last = validPoints.at(-1);
+  const shares = value / Number(first.close);
+  const endingValue = shares * Number(last.close);
+  let peak = value;
+  let maxDrawdown = 0;
+  const equityCurve = validPoints.map(point => {
+    const equity = shares * Number(point.close);
+    peak = Math.max(peak, equity);
+    maxDrawdown = Math.max(maxDrawdown, peak > 0 ? (peak - equity) / peak : 0);
+    return { date: point.date, value: equity };
+  });
+  return {
+    verdict: 'pass',
+    reason: 'This hypothetical historical replay fits within current projected safe surplus.',
+    invested: value,
+    shares,
+    startingPrice: Number(first.close),
+    endingPrice: Number(last.close),
+    endingValue,
+    profitLoss: endingValue - value,
+    returnPct: (endingValue / value - 1) * 100,
+    maxDrawdownPct: maxDrawdown * 100,
+    startDate: first.date,
+    endDate: last.date,
+    equityCurve,
+  };
+}
+
+export function executePaperOrder({ portfolio, symbol, side, shares, price, safeSurplus, railsEnabled }) {
+  if (!railsEnabled) return { ok: false, reason: 'Safety rails are off. Turn them on before placing a paper order.' };
+  const quantity = Number(shares);
+  const unitPrice = Number(price);
+  if (!['SPY', 'AAPL', 'MSFT', 'TSLA'].includes(symbol)) return { ok: false, reason: 'Choose a supported paper asset.' };
+  if (!['buy', 'sell'].includes(side)) return { ok: false, reason: 'Choose buy or sell.' };
+  if (!Number.isFinite(quantity) || quantity <= 0 || quantity > 100000) return { ok: false, reason: 'Enter a valid positive share quantity.' };
+  if (!Number.isFinite(unitPrice) || unitPrice <= 0) return { ok: false, reason: 'A current market quote is required.' };
+  const amount = quantity * unitPrice;
+  const cash = Number(portfolio?.cash);
+  if (!Number.isFinite(cash) || cash < 0) return { ok: false, reason: 'The paper account cash balance is invalid.' };
+
+  const existing = portfolio.positions?.[symbol] || { shares: 0, averageCost: 0 };
+  const ownedShares = Number(existing.shares) || 0;
+  let nextCash = cash;
+  let nextShares = ownedShares;
+  let nextAverageCost = Number(existing.averageCost) || 0;
+  if (side === 'buy') {
+    if (!Number.isFinite(safeSurplus) || amount > safeSurplus) return { ok: false, reason: `Purchase exceeds the current safe surplus of $${Math.max(0, Number(safeSurplus) || 0).toLocaleString()}.` };
+    if (amount > cash) return { ok: false, reason: `Purchase exceeds paper-account cash of $${cash.toLocaleString()}.` };
+    nextAverageCost = ((ownedShares * nextAverageCost) + amount) / (ownedShares + quantity);
+    nextShares += quantity;
+    nextCash -= amount;
+  } else {
+    if (quantity > ownedShares) return { ok: false, reason: `You can only sell the ${ownedShares} shares currently in this paper portfolio.` };
+    nextShares -= quantity;
+    nextCash += amount;
+    if (nextShares === 0) nextAverageCost = 0;
+  }
+
+  const order = {
+    id: `paper-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    symbol,
+    side,
+    shares: quantity,
+    price: unitPrice,
+    amount,
+    createdAt: new Date().toISOString(),
+  };
+  return {
+    ok: true,
+    order,
+    portfolio: {
+      cash: Number(nextCash.toFixed(2)),
+      positions: {
+        ...portfolio.positions,
+        [symbol]: { shares: Number(nextShares.toFixed(8)), averageCost: Number(nextAverageCost.toFixed(4)) },
+      },
+      orders: [order, ...(portfolio.orders || [])].slice(0, 50),
+    },
+  };
 }
 
 export function getSafeSurplus(forecast, reserve = essentialReserve) {
