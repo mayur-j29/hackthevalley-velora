@@ -81,7 +81,7 @@ export default function TradingDesk({ autoStart = true }) {
   const watchlistRef = useRef(watchlist);
   const busyRef = useRef(false);
   const scanAttemptedRef = useRef(false);
-  const processedBarsRef = useRef(Object.fromEntries([...(account.decisions || []), ...account.fills].reduce((latest, item) => {
+  const processedBarsRef = useRef(Object.entries([...(account.decisions || []), ...account.fills].reduce((latest, item) => {
     if (item.symbol && item.time && item.time > (latest[item.symbol] || '')) latest[item.symbol] = item.time;
     return latest;
   }, {})));
