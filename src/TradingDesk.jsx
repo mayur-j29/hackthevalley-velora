@@ -10,7 +10,7 @@ const cents = value => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 const readWatchlist = () => {
   try {
     const stored = JSON.parse(window.localStorage.getItem('velora-trading-watchlist') || 'null');
-    const normalized = Array.isArray(stored) ? stored.map(value => String(value).includes(':') ? String(value) : `${String(value).replace(/\.TO$/i, '')}:${String(value).endsWith('.TO') ? 'TSX' : 'NYSE'}`).filter(value => /^[A-Z0-9.-]{1,15}:(NYSE|TSX)$/.test(value)) : [];
+    const normalized = Array.isArray(stored) ? stored.map(value => String(value).includes(':') ? String(value) : `${String(value).replace(/\.TO$/i, '')}:${String(value).endsWith('.TO') ? 'TSX' : 'NYSE'}`).filter(value => /^[A-Z0-9.-]{1,15}:(NYSE|NASDAQ|TSX)$/.test(value)) : [];
     if (normalized.length) return [...new Set([...normalized, ...DEFAULT_SYMBOLS])].slice(0, 20);
   } catch { /* Use the starter watchlist. */ }
   return DEFAULT_SYMBOLS;
