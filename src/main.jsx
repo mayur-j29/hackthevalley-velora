@@ -521,7 +521,7 @@ function App() {
   const pages = [
     { label: 'Wealth Manager', page: 'Wealth', icon: CircleDollarSign },
     { label: 'Overview', page: 'Overview', icon: LayoutDashboard },
-    { label: 'AI Trading', page: 'Trading', icon: Activity },
+    { label: 'Trading', page: 'Trading', icon: Activity },
     { label: 'What if?', page: 'WhatIf', icon: Sparkles },
     { label: 'Markets', page: 'Markets', icon: TrendingUp },
     { label: 'Planning', page: 'Planning', icon: CalendarDays },
@@ -549,14 +549,14 @@ function App() {
     </aside>
     <div className="workspace">
     <header className="topbar">
-      <div className="top-actions"><span className="status"><i/> {activePage === 'Wealth' ? 'Simulated market ready' : linkedAccount ? 'Plaid Sandbox linked' : persona === 'Adult' ? 'Account workspace ready' : 'Practice account ready'}</span><span className="engine"><Sparkles size={13}/> {activePage === 'Wealth' ? 'AI simulation' : `AI ${aiStatus === 'live' ? 'connected' : aiStatus === 'demo' ? 'rules fallback' : 'ready'}`}</span>{activePage !== 'Wealth' && persona !== 'Kid' && (accountProfile || savedAccount) && <button className="session-button" onClick={accountProfile ? logOut : logIn}>{accountProfile ? 'Log out' : 'Log in'}</button>}<button className="new-account-button" onClick={createNewAccount}>New account</button><button className="icon-btn" aria-label="Notifications"><Bell size={18}/></button><button className="avatar" aria-label="Account profile">{(accountProfile?.firstName || persona).slice(0, 1).toUpperCase()}</button></div>
+      <div className="top-actions">{activePage !== 'Wealth' && persona !== 'Kid' && (accountProfile || savedAccount) && <button className="session-button" onClick={accountProfile ? logOut : logIn}>{accountProfile ? 'Log out' : 'Log in'}</button>}<button className="new-account-button" onClick={createNewAccount}>New account</button><button className="icon-btn" aria-label="Notifications"><Bell size={18}/></button><button className="avatar" aria-label="Account profile">{(accountProfile?.firstName || persona).slice(0, 1).toUpperCase()}</button></div>
     </header>
     <main id="top" className="dashboard">
       {['Overview','Portfolio','Tools','Learn'].includes(activePage) && <div className="page-title-row"><div><div className="eyebrow">{activePageLabel.toUpperCase()}</div><h1>{activePage === 'Overview' ? (accountProfile?.firstName ? `Welcome, ${accountProfile.firstName}` : displayName) : activePageLabel}</h1><p>{activePage === 'Overview' ? personaCopy : activePage === 'Portfolio' ? (persona === 'Adult' ? 'Account cash, investments, and recent activity.' : 'Your practice cash, stocks, and recent decisions.') : activePage === 'Learn' ? 'Short, friendly lessons about money, stocks, and chart patterns.' : persona === 'Adult' ? 'Review your financial planning tools.' : 'Explore guarded tools for your practice account.'}</p></div><span className="page-persona-tag">{linkedAccount ? 'Plaid Sandbox' : persona === 'Adult' ? 'Personal account' : 'Demo account'} · {persona}</span></div>}
       <div className="page-content">
       {activePage === 'Learn' && persona === 'Kid' && <KidLearning/>}
       {activePage === 'Wealth' && persona !== 'Kid' && <WealthManager userAccount={accountProfile}/>}
-      <div style={{ display: activePage === 'Trading' ? 'block' : 'none' }} aria-hidden={activePage !== 'Trading'}><TradingDesk key={accountProfile?.id || 'no-account'} autoStart={Boolean(accountProfile)} onAiStatus={setAiStatus} persona={persona}/></div>
+      <div style={{ display: activePage === 'Trading' ? 'block' : 'none' }} aria-hidden={activePage !== 'Trading'}><TradingDesk key={accountProfile?.id || 'no-account'} persona={persona}/></div>
       {activePage === 'WhatIf' && <WhatIfCoach persona={persona} cash={whatIfCash - purchase} income={income} bills={bills} safeSurplus={safeSurplus} projectedLow={lowestBalance} reserve={reserve}/>}
       {activePage === 'Overview' && <>
       <section className="summary-grid" aria-label={`${persona} account overview`}>
