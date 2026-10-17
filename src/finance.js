@@ -16,8 +16,8 @@ export const scheduledEvents = [
 const startDate = new Date();
 startDate.setHours(0, 0, 0, 0);
 
-export function buildForecast({ purchase = 0, cancelled = [], days = 30 } = {}) {
-  let balance = startingBalance - purchase;
+export function buildForecast({ purchase = 0, cancelled = [], days = 30, balance: accountBalance = startingBalance } = {}) {
+  let balance = accountBalance - purchase;
   return Array.from({ length: days + 1 }, (_, day) => {
     const events = scheduledEvents.filter(event => event.day === day && !cancelled.includes(event.subscription));
     events.forEach(event => { balance += event.amount; });

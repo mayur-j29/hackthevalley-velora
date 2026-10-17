@@ -10,7 +10,7 @@ const subscriptions = [
   { name: 'GoodLife Fitness', detail: 'Wellness · monthly', amount: 39.99, icon: 'g', color: '#62a587' },
   { name: 'Spotify', detail: 'Music · monthly', amount: 12.99, icon: '◖', color: '#1f9c67' },
 ];
-const money = (value, digits = 0) => new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD', maximumFractionDigits: digits, minimumFractionDigits: digits }).format(value);
+const money = (value, digits = 0) => `$${new Intl.NumberFormat('en-CA', { maximumFractionDigits: digits, minimumFractionDigits: digits }).format(value)}`;
 
 function CashFlowChart({ forecast }) {
   const [hover, setHover] = useState(null);
@@ -58,7 +58,14 @@ function App() {
   const [aiStatus, setAiStatus] = useState('demo');
   const [aiLoading, setAiLoading] = useState(false);
   const [mobileMenu, setMobileMenu] = useState(false);
-  const forecast = useMemo(() => buildForecast({ purchase, cancelled }), [purchase, cancelled]);
+  const [plaidAccessToken, setPlaidAccessToken] = useState('');
+  const [linkedAccount, setLinkedAccount] = useState(null);
+  const [linkedInstitution, setLinkedInstitution] = useState('');
+  const [plaidBusy, setPlaidBusy] = useState(false);
+  const [plaidMessage, setPlaidMessage] = useState('');
+  const [sandboxTransfers, setSandboxTransfers] = useState([]);
+  const accountBalance = linkedAccount?.available ?? linkedAccount?.current ?? startingBalance;
+  const forecast = useMemo(() => buildForecast({ purchase, cancelled, balance: accountBalance }), [purchase, cancelled, accountBalance]);
   const { lowestBalance, safeSurplus } = useMemo(() => getSafeSurplus(forecast), [forecast]);
   const bills = forecast.flatMap(point => point.events).filter(event => event.amount < 0).reduce((sum,event) => sum + Math.abs(event.amount),0);
   const income = forecast.flatMap(point => point.events).filter(event => event.amount > 0).reduce((sum,event) => sum + event.amount,0);
@@ -67,6 +74,59 @@ function App() {
   const autoPlan = useMemo(() => simulateAutoInvest({ forecast, amount: contribution, cadence, railsEnabled: rails, floor: 300 }), [forecast, contribution, cadence, rails]);
   const displayName = persona === 'Kid' ? 'Your money is growing' : persona === 'Student' ? 'You’ve got this, Alex' : 'A clearer view of your money';
   const personaCopy = persona === 'Kid' ? 'Every small choice is a chance to learn.' : persona === 'Student' ? 'Tuition, rent, and the rest of life—in one clear plan.' : 'Your next move, with a little more clarity.';
+
+  async function plaidRequest(payload) {
+    const response = await fetch('/api/plaid', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Plaid Sandbox is unavailable.');
+    return data;
+  }
+
+  async function linkSandboxBank() {
+    if (!window.Plaid) { setPlaidMessage('Plaid Link could not load. Open the deployed Vercel app with internet access.'); return; }
+    setPlaidBusy(true);
+    setPlaidMessage('');
+    try {
+      const { linkToken } = await plaidRequest({ action: 'link-token' });
+      const linkHandler = window.Plaid.create({
+        token: linkToken,
+        onSuccess: async (publicToken, metadata) => {
+          try {
+            const { accessToken } = await plaidRequest({ action: 'exchange', public_token: publicToken });
+            const { accounts } = await plaidRequest({ action: 'accounts', access_token: accessToken });
+            const selected = metadata.accounts?.[0]?.id;
+            const account = accounts.find(item => item.accountId === selected) || accounts.find(item => ['checking', 'savings'].includes(item.subtype));
+            if (!account) throw new Error('No eligible checking or savings account was returned.');
+            setPlaidAccessToken(accessToken);
+            setLinkedAccount(account);
+            setLinkedInstitution(metadata.institution?.name || 'Plaid Sandbox Bank');
+            setPlaidMessage('Sandbox account connected for this browser session.');
+          } catch (error) { setPlaidMessage(error.message); }
+          finally { setPlaidBusy(false); }
+        },
+        onExit: () => setPlaidBusy(false),
+      });
+      linkHandler.open();
+    } catch (error) {
+      setPlaidMessage(error.message);
+      setPlaidBusy(false);
+    }
+  }
+
+  async function createSandboxTransfer() {
+    if (!plaidAccessToken || !linkedAccount) return;
+    if (!rails) { setPlaidMessage('Turn safety rails on before creating a bank transfer.'); return; }
+    setPlaidBusy(true);
+    setPlaidMessage('');
+    try {
+      const result = await plaidRequest({ action: 'transfer', access_token: plaidAccessToken, account_id: linkedAccount.accountId, amount });
+      setSandboxTransfers(previous => [result.transfer, ...previous]);
+      setPlaidMessage(`Transfer ${result.transfer.status} · ${money(result.transfer.amount,2)} · ${result.transfer.id}`);
+      const { accounts } = await plaidRequest({ action: 'accounts', access_token: plaidAccessToken });
+      setLinkedAccount(accounts.find(account => account.accountId === linkedAccount.accountId) || linkedAccount);
+    } catch (error) { setPlaidMessage(error.message); }
+    finally { setPlaidBusy(false); }
+  }
 
   async function askCopilot(prompt = question) {
     const text = prompt.trim();
@@ -97,17 +157,18 @@ function App() {
     <header className="topbar">
       <a className="brand" href="#top" aria-label="Velora home"><span className="brand-mark"><span/><span/><span/></span><span>velora</span></a>
       <nav className={mobileMenu ? 'persona-nav open' : 'persona-nav'} aria-label="Choose your view">{personas.map(item => <button key={item} className={persona === item ? 'persona active' : 'persona'} onClick={() => setPersona(item)}>{item}</button>)}</nav>
-      <div className="top-actions"><span className="status"><i/> Sample account · read only</span><span className="engine"><Sparkles size={13}/> Gemini {aiStatus === 'live' ? 'connected' : 'demo mode'}</span><button className="icon-btn" aria-label="Notifications"><Bell size={18}/></button><button className="avatar" aria-label="Account profile">A</button><button className="mobile-menu" onClick={() => setMobileMenu(!mobileMenu)} aria-label="Toggle persona menu"><Menu size={19}/></button></div>
+      <div className="top-actions"><span className="status"><i/> {linkedAccount ? 'Sandbox bank linked' : 'Sandbox bank ready'}</span><span className="engine"><Sparkles size={13}/> Gemini {aiStatus === 'live' ? 'connected' : 'demo mode'}</span><button className="icon-btn" aria-label="Notifications"><Bell size={18}/></button><button className="avatar" aria-label="Account profile">A</button><button className="mobile-menu" onClick={() => setMobileMenu(!mobileMenu)} aria-label="Toggle persona menu"><Menu size={19}/></button></div>
     </header>
     <main id="top" className="dashboard">
-      <div className="welcome-row"><div><div className="eyebrow light-eyebrow"><span className="eyebrow-dash"/> YOUR FINANCIAL SNAPSHOT <span className="date-label">· NEXT 30 DAYS</span></div><h1>{displayName}<span className="period">.</span></h1><p className="welcome-copy">{personaCopy}</p></div><div className="account-chip"><span className="bank-icon"><Landmark size={17}/></span><span><b>Demo chequing</b><small>Sample data · read only</small></span><ChevronDown size={16}/></div></div>
+      <div className="welcome-row"><div><div className="eyebrow light-eyebrow"><span className="eyebrow-dash"/> YOUR FINANCIAL SNAPSHOT <span className="date-label">· NEXT 30 DAYS</span></div><h1>{displayName}<span className="period">.</span></h1><p className="welcome-copy">{personaCopy}</p></div><button className="account-chip" onClick={linkSandboxBank} disabled={plaidBusy}><span className="bank-icon"><Landmark size={17}/></span><span><b>{linkedAccount ? linkedInstitution : 'Link a sandbox bank'}</b><small>{linkedAccount ? `${linkedAccount.name} · •••• ${linkedAccount.mask}` : plaidBusy ? 'Opening secure Plaid Link…' : 'Test account · no real funds'}</small></span><ChevronDown size={16}/></button></div>
       <section className="summary-grid" aria-label="Account overview">
-        <article className="summary-card balance-card"><div className="card-topline"><span>Current balance</span><CircleHelp size={15}/></div><div className="balance-amount">{money(startingBalance-purchase,2)}</div><div className="balance-foot"><span className="up-label"><TrendingUp size={14}/> Plan in view</span><span>Sample account</span></div><div className="balance-spark"><svg viewBox="0 0 140 42"><path d="M1 32 C18 26 18 33 33 25 S55 28 65 17 S84 23 98 12 S116 19 139 3" fill="none" stroke="#70b69a" strokeWidth="2"/></svg></div></article>
+        <article className="summary-card balance-card"><div className="card-topline"><span>{linkedAccount ? 'Linked bank balance' : 'Starting balance'}</span><CircleHelp size={15}/></div><div className="balance-amount">{money(accountBalance-purchase,2)}</div><div className="balance-foot"><span className="up-label"><TrendingUp size={14}/> {linkedAccount ? 'Plaid Sandbox' : 'Sample account'}</span><span>{linkedAccount ? `${linkedAccount.currency} · •••• ${linkedAccount.mask}` : 'Demo data'}</span></div><div className="balance-spark"><svg viewBox="0 0 140 42"><path d="M1 32 C18 26 18 33 33 25 S55 28 65 17 S84 23 98 12 S116 19 139 3" fill="none" stroke="#70b69a" strokeWidth="2"/></svg></div></article>
         <article className="summary-card"><div className="card-topline"><span>Income · 30 days</span><span className="metric-icon income-icon"><ArrowDownLeft size={17}/></span></div><div className="metric-amount">{money(income,0)}</div><div className="metric-foot"><span className="metric-note"><i className="small-green-dot"/> Paydays included</span></div></article>
         <article className="summary-card"><div className="card-topline"><span>Planned outflows</span><span className="metric-icon bill-icon"><ArrowUpRight size={17}/></span></div><div className="metric-amount">{money(bills,0)}</div><div className="metric-foot"><span className="metric-note">Scheduled bills included</span></div></article>
         <article className="summary-card"><div className="card-topline"><span>Safe to explore</span><span className="metric-icon safe-icon"><ShieldCheck size={17}/></span></div><div className="metric-amount">{money(safeSurplus,0)}</div><div className="metric-foot"><span className="metric-note">After a {money(1200)} cash buffer</span></div></article>
       </section>
-      <section className="panel forecast-panel"><div className="panel-heading"><div><div className="eyebrow">CASH FLOW <span className="live-pill"><i/> SCENARIO MODEL</span></div><h2>See the next 30 days, before they happen.</h2><p>Scheduled income and bills shape every simulation.</p></div><span className="range-select"><Activity size={14}/> 30-day forecast</span></div><div className="chart-summary"><div><span>Projected today</span><strong>{money(startingBalance-purchase,2)}</strong></div><div className="projection-divider"/><div><span>Forecast low</span><strong className={lowestBalance < 1200 ? 'coral-text' : ''}>{money(lowestBalance,2)}</strong></div><div className="forecast-tag"><ShieldCheck size={15}/><span>{lowestBalance >= 1200 ? 'Reserve stays covered' : 'Reserve needs attention'}</span></div></div><CashFlowChart forecast={forecast}/>{crash && <div className="crash-note"><TrendingDown size={15}/><span>{crashScenarios[crash].label}: a {money(Number(amount||0))} hypothetical {ticker} position would be worth about {money(Number(amount||0)*(1-crashScenarios[crash].drawdown),2)} at the scenario low. This replay is illustrative and separate from your cash forecast.</span><button onClick={() => setCrash('')} aria-label="Dismiss crash replay"><X size={14}/></button></div>}</section>
+      <section className="panel forecast-panel"><div className="panel-heading"><div><div className="eyebrow">CASH FLOW <span className="live-pill"><i/> 30-DAY OUTLOOK</span></div><h2>See the next 30 days, before they happen.</h2><p>Scheduled income and bills shape every planning decision.</p></div><span className="range-select"><Activity size={14}/> 30-day forecast</span></div><div className="chart-summary"><div><span>Projected today</span><strong>{money(accountBalance-purchase,2)}</strong></div><div className="projection-divider"/><div><span>Forecast low</span><strong className={lowestBalance < 1200 ? 'coral-text' : ''}>{money(lowestBalance,2)}</strong></div><div className="forecast-tag"><ShieldCheck size={15}/><span>{lowestBalance >= 1200 ? 'Reserve stays covered' : 'Reserve needs attention'}</span></div></div><CashFlowChart forecast={forecast}/>{crash && <div className="crash-note"><TrendingDown size={15}/><span>{crashScenarios[crash].label}: a {money(Number(amount||0))} hypothetical {ticker} position would be worth about {money(Number(amount||0)*(1-crashScenarios[crash].drawdown),2)} at the scenario low. This replay is illustrative and separate from your cash forecast.</span><button onClick={() => setCrash('')} aria-label="Dismiss crash replay"><X size={14}/></button></div>}</section>
+      <section className="panel bank-transfer-panel"><div className="section-title"><div className="section-icon blue-icon"><Landmark size={18}/></div><div><div className="eyebrow">PLAID SANDBOX</div><h2>Linked account activity</h2></div><span className={`bank-connection-pill ${linkedAccount?'connected':''}`}><i/>{linkedAccount?'CONNECTED':'TEST MODE'}</span></div><p className="section-description">Connect a Plaid test account, then create a guarded sandbox transfer. The bank API writes a transfer record; no real funds or stock orders move in Sandbox.</p>{linkedAccount ? <div className="linked-bank-row"><span className="bank-icon light"><Landmark size={17}/></span><div><b>{linkedInstitution} · {linkedAccount.name}</b><small>{linkedAccount.subtype} account · •••• {linkedAccount.mask} · {linkedAccount.currency}</small></div><div className="linked-bank-balance"><span>Available</span><b>{money(linkedAccount.available ?? linkedAccount.current,2)}</b></div></div> : <div className="bank-connect-callout"><div><b>Connect a test institution</b><small>Use Plaid's Sandbox sign-in, never your real bank credentials.</small></div><button className="connect-plaid-button" onClick={linkSandboxBank} disabled={plaidBusy}>{plaidBusy?'Connecting…':'Open Plaid Link'} <ArrowUpRight size={15}/></button></div>}<div className="sandbox-transfer-row"><label><span>TRANSFER AMOUNT</span><div className="amount-input"><b>$</b><input type="number" min="1" max="1000" value={amount} onChange={event=>setAmount(event.target.value)} aria-label="Sandbox transfer amount"/></div></label><button className="sandbox-transfer-button" onClick={createSandboxTransfer} disabled={!linkedAccount || plaidBusy || !rails}>{plaidBusy?'Working…':'Create sandbox transfer'} <ArrowUpRight size={15}/></button></div>{!rails&&<div className="sandbox-rules-message"><ShieldCheck size={14}/> Turn deterministic safety rails on before submitting a transfer.</div>}{plaidMessage&&<div className="plaid-message" role="status">{plaidMessage}</div>}{sandboxTransfers.length>0&&<div className="transfer-list"><div className="transfer-list-heading">RECENT SANDBOX TRANSFERS <small>REAL PLAID TEST RECORDS · NO REAL FUNDS</small></div>{sandboxTransfers.map(transfer=><div className="transfer-row" key={transfer.id}><span className="transfer-check"><Check size={14}/></span><div><b>Velora investment contribution</b><small>{new Date(transfer.created).toLocaleString('en-CA')} · {transfer.network?.toUpperCase()} · {transfer.id}</small></div><strong>−{money(transfer.amount,2)}</strong><span className="transfer-status">{transfer.status}</span></div>)}</div>}</section>
       <div className="lower-grid">
         <section className="panel invest-panel automation-panel"><div className="section-title"><div className="section-icon green-icon"><Activity size={18}/></div><div><div className="eyebrow">AUTOMATION LAB</div><h2>Recurring investing</h2></div><span className="sim-only">SIMULATION ONLY</span></div><p className="section-description">Set a cadence. Velora checks every future bill before each simulated buy.</p><div className="automation-pool"><div><span>Available safe surplus</span><b>{money(safeSurplus)}</b></div><span className="safe-label"><ShieldCheck size={14}/> {rails ? 'Rules on' : 'Rules off'}</span></div><div className="auto-fields"><label><span>CONTRIBUTE</span><div className="amount-input"><b>$</b><input type="number" min="1" value={contribution} onChange={event => {setContribution(event.target.value);setAutoResult(null)}} aria-label="Contribution amount"/></div></label><label><span>CADENCE</span><div className="select-wrap"><select value={cadence} onChange={event => {setCadence(event.target.value);setAutoResult(null)}}><option value="7">Weekly</option><option value="14">Every 2 weeks</option><option value="30">Monthly</option></select><ChevronDown size={15}/></div></label></div><div className="automation-context"><span>Cash floor</span><b>{money(300)}</b><span>Protected essentials</span><b>{money(1200)}</b></div><button className="trade-button" onClick={() => setAutoResult(autoPlan)}><span>Run 30-day auto-invest</span><ArrowUpRight size={16}/></button>{autoResult && <div className="automation-result"><div className="result-head"><span className="result-icon"><Check size={15}/></span><div><b>{autoResult.executions.length} simulated contribution{autoResult.executions.length===1?'':'s'} · {money(autoResult.total)}</b><small>{autoResult.reason}</small></div></div>{autoResult.executions.length > 0 ? <div className="execution-chips">{autoResult.executions.map(run => <span key={run.day}>{run.date.toLocaleDateString('en-CA',{month:'short',day:'numeric'})} <b>+{money(run.amount)}</b></span>)}</div> : <div className="execution-empty">No contribution cleared the current guardrails. Lower the amount or review the cash floor.</div>}{autoResult.blocked.length > 0 && <small className="blocked-count">{autoResult.blocked.length} scheduled attempt{autoResult.blocked.length===1?'':'s'} blocked to protect bills.</small>}</div>}<div className="rails-row"><div><b>Deterministic safety rails</b><small>Only rules decide PASS or BLOCK</small></div><button className={rails ? 'toggle on' : 'toggle'} onClick={() => {setRails(!rails);setTradePreview(false);setAutoResult(null)}} aria-label="Toggle deterministic safety rails"><i/></button></div>
           <div className="manual-trade"><div className="manual-heading"><div><b>One-time trade check</b><small>Separate from your recurring plan</small></div><span>RULES ENGINE</span></div><div className="trade-fields"><label><span>ASSET</span><div className="select-wrap"><select value={ticker} onChange={event => setTicker(event.target.value)}><option>S&amp;P 500</option><option>AAPL</option><option>MSFT</option><option>TSLA</option></select><ChevronDown size={15}/></div></label><label><span>AMOUNT</span><div className="amount-input"><b>$</b><input type="number" min="1" value={amount} onChange={event => {setAmount(event.target.value);setTradePreview(false)}}/></div></label></div><button className="trade-button secondary-trade" onClick={() => setTradePreview(true)}>Check simulated order <ArrowUpRight size={15}/></button>{tradePreview && <div className={`rules-verdict ${decision.verdict==='blocked'?'blocked':'passed'}`}><div className="verdict-icon">{decision.verdict==='blocked'?<X size={15}/>:<Check size={15}/>}</div><div><b>{decision.verdict==='blocked'?'BLOCKED BY RULES':'PASS · SIMULATION READY'}</b><p>{decision.reason}</p></div></div>}</div>

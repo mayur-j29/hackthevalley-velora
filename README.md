@@ -20,3 +20,15 @@ Gemini receives only bounded sample aggregates and the user's short question. It
 ## Safety
 
 All balances and events are synthetic. Velora does not connect to a bank, execute or route orders, move funds, or provide formal financial advice. Historic market replay is illustrative, not a prediction.
+
+## Plaid Sandbox account and transfer flow
+
+1. Create a free Plaid developer account at [dashboard.plaid.com/signup](https://dashboard.plaid.com/signup).
+2. In the Plaid Dashboard, open **Team Settings → Keys** and copy the **Sandbox** `client_id` and `secret`.
+3. In the Vercel project, open **Settings → Environment Variables** and add `PLAID_CLIENT_ID` and `PLAID_SECRET` for Preview (and Development if needed). Keep them server-side. Redeploy after adding them.
+4. Open the deployed Vercel site, click **Link a sandbox bank**, and choose a Sandbox institution such as First Platypus Bank. Plaid's standard Sandbox login is `user_good` / `pass_good`.
+5. Select a checking account. Velora will load its Sandbox balance, run the server-side deterministic reserve check, then allow a capped test ACH transfer. The browser holds the Sandbox access token only in memory; reload the page to relink.
+
+The app's `/api/plaid` handler is hard-coded to `sandbox.plaid.com` and rejects non-Sandbox access tokens. It cannot connect to a production bank. Plaid Sandbox is free, but it uses fake bank data: creating a transfer creates a Plaid test record and does not move money or place a stock order. Sandbox transfers normally remain pending until you advance their status in Plaid's Dashboard. A production account or brokerage integration is a separate, regulated setup and is not enabled here.
+
+For local testing of Vercel serverless routes, use `npx vercel dev` after adding the same variables to a local `.env.local` file. Do not commit `.env.local`; `.env.example` lists the variable names only.
