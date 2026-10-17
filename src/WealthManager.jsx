@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Activity, ArrowDownRight, ArrowUpRight, Bot, CalendarDays, ChevronDown, CircleDollarSign, RotateCcw, ShieldCheck, Sparkles, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
+import { Activity, ArrowDownRight, ArrowUpRight, Baby, Bot, BriefcaseBusiness, CalendarDays, ChevronDown, CircleDollarSign, GraduationCap, RotateCcw, ShieldCheck, Sparkles, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
 import { ASSETS, PERSONAS, REGIMES, buildBenchmarkSeries, createSimulation, loadSimulation, saveSimulation } from './simulation.ts';
 import { checkAgentAction, dailyDrawdown, DAILY_DRAWDOWN_LIMIT, generateFallbackActions, targetWeights } from './wealth-agent.js';
 import { supabase, supabaseConfigured } from './supabase.js';
@@ -25,6 +25,12 @@ function readLocalUserProfile() {
     return saved && typeof saved.name === 'string' && ['aggressive', 'balanced', 'conservative'].includes(saved.risk) ? saved : null;
   } catch { return null; }
 }
+
+const ACCOUNT_TYPES = [
+  { id: 'kids', title: 'Kids', description: 'A guardian-managed space to learn healthy money habits.', detail: 'Learning first · steady growth', risk: 'conservative', persona: 'elena', Icon: Baby },
+  { id: 'student', title: 'Student', description: 'Build confidence with a small, long-term practice portfolio.', detail: 'Start small · growth focused', risk: 'aggressive', persona: 'aisha', Icon: GraduationCap },
+  { id: 'adult', title: 'Adult', description: 'Balance everyday goals with a thoughtful investing plan.', detail: 'Flexible goals · balanced plan', risk: 'balanced', persona: 'marcus', Icon: BriefcaseBusiness },
+];
 
 function LineChart({ rows, selected }) {
   const points = rows.slice(-selected - 1);
@@ -60,6 +66,8 @@ export default function WealthManager() {
   const [userProfile, setUserProfile] = useState(() => supabaseConfigured ? null : readLocalUserProfile());
   const [profileDraft, setProfileDraft] = useState({ name: '', age: '', occupation: '', risk: 'balanced', goal: 'Build long-term wealth', horizonYears: 20 });
   const [profileBusy, setProfileBusy] = useState(false);
+  const [landingComplete, setLandingComplete] = useState(false);
+  const [selectedAccountType, setSelectedAccountType] = useState(() => readLocalUserProfile()?.accountType || 'adult');
   const [syncError, setSyncError] = useState('');
   const sessionRef = useRef(null);
   const cloudReadyUserRef = useRef(null);
@@ -109,6 +117,7 @@ export default function WealthManager() {
         setSimulation(restored);
         const savedProfile = data?.profile && typeof data.profile.name === 'string' ? data.profile : null;
         setUserProfile(savedProfile);
+        setSelectedAccountType(ACCOUNT_TYPES.some(type => type.id === savedProfile?.accountType) ? savedProfile.accountType : 'adult');
         const savedAccount = window.localStorage.getItem(`velora-simulation-active-account-${nextSession.user.id}`);
         const riskPersona = savedProfile?.risk === 'aggressive' ? 'aisha' : savedProfile?.risk === 'conservative' ? 'elena' : 'marcus';
         setAccountId(PERSONAS.some(person => person.id === savedAccount) ? savedAccount : riskPersona);
@@ -182,7 +191,7 @@ export default function WealthManager() {
       setAuthError('Enter a name, an age from 18 to 100, and a horizon from 1 to 60 years.');
       return;
     }
-    const nextProfile = { ...profileDraft, name, age, horizonYears, occupation: profileDraft.occupation.trim().slice(0, 48), goal: profileDraft.goal.trim().slice(0, 120) || 'Build long-term wealth' };
+    const nextProfile = { ...profileDraft, name, age, horizonYears, accountType: selectedAccountType || profileDraft.accountType || 'adult', occupation: profileDraft.occupation.trim().slice(0, 48), goal: profileDraft.goal.trim().slice(0, 120) || 'Build long-term wealth' };
     setProfileBusy(true); setAuthError('');
     const preferredAccount = nextProfile.risk === 'aggressive' ? 'aisha' : nextProfile.risk === 'conservative' ? 'elena' : 'marcus';
     if (!supabaseConfigured) {
@@ -206,6 +215,26 @@ export default function WealthManager() {
       setAuthStatus('ready');
     }
     setProfileBusy(false);
+  }
+
+  function continueFromLanding() {
+    const choice = ACCOUNT_TYPES.find(type => type.id === selectedAccountType) || ACCOUNT_TYPES[2];
+    setSelectedAccountType(choice.id);
+    const defaultOccupation = choice.id === 'student' ? 'Student' : choice.id === 'kids' ? 'Parent / guardian' : 'Working professional';
+    setProfileDraft(current => ({ ...current, accountType: choice.id, risk: choice.risk, occupation: defaultOccupation }));
+    if (userProfile) {
+      const updatedProfile = { ...userProfile, accountType: choice.id };
+      setUserProfile(updatedProfile);
+      setPersona(choice.persona);
+      if (!supabaseConfigured) {
+        try { window.localStorage.setItem('velora-wealth-user-profile', JSON.stringify(updatedProfile)); } catch { /* The current selection still applies for this visit. */ }
+      } else if (session?.user?.id) {
+        void supabase.from('velora_simulations').upsert({ user_id: session.user.id, state: simulation.exportState(), profile: updatedProfile, updated_at: new Date().toISOString() }, { onConflict: 'user_id' }).then(({ error }) => {
+          if (error) setSyncError('Your account type could not be saved. Please reconnect and try again.');
+        });
+      }
+    }
+    setLandingComplete(true);
   }
   const portfolio = simulation.getPortfolio(accountId);
   const prices = simulation.getPrices();
@@ -427,6 +456,14 @@ export default function WealthManager() {
   const selectedHistory = history.slice(0, selectedIndex + 1).slice(-windowDays - 1);
 
   if (supabaseConfigured && authStatus === 'loading') return <div className="wm-auth-state"><span className="wm-spinner"/><p>Loading your saved simulation…</p></div>;
+  if (!landingComplete) return <main className="wm-landing">
+    <div className="wm-landing-glow wm-landing-glow-one"/><div className="wm-landing-glow wm-landing-glow-two"/>
+    <header className="wm-landing-header"><div className="wm-brand-lockup"><span className="wm-brand-icon"><span/><span/><span/></span><div><b>velora</b><small>SIMULATED WEALTH</small></div></div><span className="wm-landing-safe"><ShieldCheck size={14}/> Private, simulated, and yours</span></header>
+    <section className="wm-landing-hero"><span className="wm-eyebrow">A CALMER WAY TO BUILD MONEY CONFIDENCE</span><h1>Your next chapter<br/><em>starts here.</em></h1><p>Choose the space that fits you. Velora helps you learn, plan, and grow with a fully simulated portfolio.</p></section>
+    <section className="wm-account-options" aria-label="Choose an account type">{ACCOUNT_TYPES.map(({ id, title, description, detail, Icon }) => <button type="button" key={id} className={`wm-account-option${selectedAccountType === id ? ' selected' : ''}`} onClick={() => setSelectedAccountType(id)} aria-pressed={selectedAccountType === id}><span className="wm-account-icon"><Icon size={21}/></span><span className="wm-account-title">{title}</span><span className="wm-account-description">{description}</span><span className="wm-account-detail">{detail}</span><span className="wm-account-radio"/></button>)}</section>
+    <div className="wm-landing-actions"><button className="wm-primary-button" onClick={continueFromLanding}>Continue <span aria-hidden="true">→</span></button><span>No real money. No brokerage connection.</span></div>
+    <footer className="wm-landing-footer">SIMULATED ENVIRONMENT <span/> NOT FINANCIAL ADVICE</footer>
+  </main>;
   if (supabaseConfigured && authStatus !== 'ready') return <section className="wm-auth-card">
     <div className="wm-brand-lockup"><span className="wm-brand-icon"><span/><span/><span/></span><div><b>velora</b><small>SIMULATED WEALTH</small></div></div>
     <span className="wm-eyebrow">PRIVATE SIMULATED WORKSPACE</span>
@@ -440,23 +477,25 @@ export default function WealthManager() {
     {authError && <div className="wm-auth-error" role="alert">{authError}</div>}
     {authMessage && <div className="wm-auth-message" role="status">{authMessage}</div>}
     <button className="wm-auth-switch" onClick={() => { setAuthMode(authMode === 'signup' ? 'signin' : 'signup'); setAuthError(''); setAuthMessage(''); }}>{authMode === 'signup' ? 'Already have an account? Sign in' : 'New to Velora? Create an account'}</button>
+    <button className="wm-auth-switch" onClick={() => setLandingComplete(false)}>← Choose a different account type</button>
     {authStatus === 'error' && <button className="wm-auth-switch" onClick={async () => { await supabase.auth.signOut(); setAuthStatus('signedout'); setAuthError(''); }}>Sign out and try again</button>}
     <small>Simulated environment only. No real money or brokerage account is connected.</small>
   </section>;
   if ((!supabaseConfigured || authStatus === 'ready') && !userProfile) return <section className="wm-auth-card wm-profile-card">
     <div className="wm-brand-lockup"><span className="wm-brand-icon"><span/><span/><span/></span><div><b>velora</b><small>SIMULATED WEALTH</small></div></div>
-    <span className="wm-eyebrow">YOUR STARTING PROFILE</span>
-    <h1>Who are you?</h1>
-    <p>Tell Velora how to personalize your simulated workspace. These details stay {supabaseConfigured ? 'in your private account' : 'in this browser'} and do not connect to any real financial account.</p>
+    <span className="wm-eyebrow">{ACCOUNT_TYPES.find(type => type.id === selectedAccountType)?.title || 'YOUR'} STARTING PROFILE</span>
+    <h1>Let’s make it yours.</h1>
+    <p>{selectedAccountType === 'kids' ? 'A parent or guardian sets up this learning space. Enter the adult account holder’s details.' : 'Tell Velora how to personalize your simulated workspace.'} These details stay {supabaseConfigured ? 'in your private account' : 'in this browser'} and do not connect to any real financial account.</p>
     <form onSubmit={saveUserProfile} className="wm-auth-form wm-profile-form">
       <label>Your name<input autoComplete="name" required maxLength="48" value={profileDraft.name} onChange={event => setProfileDraft(current => ({ ...current, name: event.target.value }))} placeholder="Name to show in Velora"/></label>
-      <div className="wm-profile-fields"><label>Age<input type="number" min="18" max="100" required value={profileDraft.age} onChange={event => setProfileDraft(current => ({ ...current, age: event.target.value }))} placeholder="35"/></label><label>What best describes you?<select value={profileDraft.occupation} onChange={event => setProfileDraft(current => ({ ...current, occupation: event.target.value }))}><option value="">Choose one</option><option>Student</option><option>Working professional</option><option>Business owner</option><option>Near retirement</option><option>Retired</option><option>Other</option></select></label></div>
+      <div className="wm-profile-fields"><label>Your age<input type="number" min="18" max="100" required value={profileDraft.age} onChange={event => setProfileDraft(current => ({ ...current, age: event.target.value }))} placeholder="35"/></label><label>What best describes you?<select value={profileDraft.occupation} onChange={event => setProfileDraft(current => ({ ...current, occupation: event.target.value }))}><option value="">Choose one</option><option>Student</option><option>Parent / guardian</option><option>Working professional</option><option>Business owner</option><option>Near retirement</option><option>Retired</option><option>Other</option></select></label></div>
       <label>Your investing comfort<select value={profileDraft.risk} onChange={event => setProfileDraft(current => ({ ...current, risk: event.target.value }))}><option value="conservative">Conservative · protect stability</option><option value="balanced">Balanced · grow steadily</option><option value="aggressive">Aggressive · pursue long-term growth</option></select></label>
       <label>What are you working toward?<input maxLength="120" value={profileDraft.goal} onChange={event => setProfileDraft(current => ({ ...current, goal: event.target.value }))} placeholder="Build long-term wealth"/></label>
       <label>Time horizon (years)<input type="number" min="1" max="60" required value={profileDraft.horizonYears} onChange={event => setProfileDraft(current => ({ ...current, horizonYears: event.target.value }))}/></label>
       {authError && <div className="wm-auth-error" role="alert">{authError}</div>}
       <button className="wm-primary-button" disabled={profileBusy}>{profileBusy ? 'Saving…' : 'Create my workspace'}</button>
     </form>
+    <button className="wm-auth-switch" onClick={() => setLandingComplete(false)}>← Choose a different account type</button>
     {supabaseConfigured && <button className="wm-auth-switch" onClick={signOut}>Sign out</button>}
     <small>Simulated environment only. The selected risk level chooses a starting paper portfolio.{supabaseConfigured ? '' : ' Add Supabase settings to sync across devices.'}</small>
   </section>;
@@ -467,7 +506,7 @@ export default function WealthManager() {
       <div className="wm-header-right">{supabaseConfigured ? <><span className="wm-sync-badge"><i className={syncError ? 'error' : ''}/>{syncError ? 'SYNC ISSUE' : 'CLOUD SYNC'}</span><button className="wm-signout-button" onClick={signOut}>Sign out</button></> : <span className="wm-sync-badge local"><i/> SAVED ON THIS DEVICE</span>}<div className="wm-market-status"><span className="wm-status-dot"/> SIM MARKET <span className="wm-status-divider"/> {prices.date}</div></div>
     </header>
 
-    <section className="wm-welcome-row"><div><div className="wm-eyebrow">YOUR SIMULATED WEALTH PLAN</div><h1>Good day, {userProfile?.name || persona.name}.</h1><p>{userProfile ? `Your ${persona.name} simulated portfolio is personalized for a ${userProfile.risk} risk profile.` : 'Your portfolio, market and AI activity in one calm view.'}</p></div><label className="wm-persona-picker"><span>SIMULATED PORTFOLIO</span><div><select value={accountId} onChange={event => setPersona(event.target.value)} aria-label="Select a demo account">{PERSONAS.map(person => <option key={person.id} value={person.id}>{person.name}, {person.age} · {person.risk}</option>)}</select><ChevronDown size={15}/></div></label></section>
+    <section className="wm-welcome-row"><div><div className="wm-eyebrow">YOUR SIMULATED WEALTH PLAN</div><h1>Good day, {userProfile?.name || persona.name}.</h1><p>{userProfile ? `Your ${persona.name} simulated portfolio is personalized for a ${userProfile.risk} risk profile.` : 'Your portfolio, market and AI activity in one calm view.'}</p></div><label className="wm-persona-picker"><span>{ACCOUNT_TYPES.find(type => type.id === selectedAccountType)?.title || 'SIMULATED'} ACCOUNT · SWITCH PORTFOLIO</span><div><select value={accountId} onChange={event => setPersona(event.target.value)} aria-label="Select a demo account">{PERSONAS.map(person => <option key={person.id} value={person.id}>{person.name}, {person.age} · {person.risk}</option>)}</select><ChevronDown size={15}/></div></label></section>
 
     <section className="wm-metrics" aria-label="Portfolio summary">
       <article className="wm-metric wm-net-worth"><div className="wm-metric-label">NET WORTH <CircleDollarSign size={16}/></div><strong>{money(portfolio.netWorth)}</strong><span>USD · simulated account</span><div className="wm-metric-spark"><Activity size={16}/><span>{pnl >= 0 ? '+' : ''}{money(pnl)} since start</span></div></article>
