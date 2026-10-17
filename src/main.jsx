@@ -1,13 +1,16 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Activity, ArrowDownLeft, ArrowUpRight, Bell, CalendarDays, Check, ChevronDown, CircleDollarSign, CircleHelp, Clock3, CreditCard, Landmark, LockKeyhole, ShieldCheck, Sparkles, TrendingDown, TrendingUp, Wallet, Wrench, X, LayoutDashboard, BriefcaseBusiness, Sun, Moon } from 'lucide-react';
+import { Activity, ArrowDownLeft, ArrowUpRight, Bell, CalendarDays, Check, ChevronDown, CircleDollarSign, CircleHelp, Clock3, Coins, CreditCard, House, Landmark, LockKeyhole, PiggyBank, ShieldCheck, Sparkles, TrendingDown, TrendingUp, Wallet, Wrench, X, LayoutDashboard, BriefcaseBusiness, Sun, Moon } from 'lucide-react';
 import { buildForecast, crashScenarios, evaluateSimulatedTrade, getSafeSurplus, simulateAutoInvest } from './finance';
 import MarketReplay from './MarketReplay';
 import PaperPortfolio from './PaperPortfolio';
 import TradingDesk from './TradingDesk';
 import WhatIfCoach from './WhatIfCoach';
 import WealthManager from './WealthManager';
-import { accrueSampleEarnings, createInitialPaperAccount, readPaperAccount, savePaperAccount, subscribePaperAccount } from './paperAccount';
+import KidExperience from './KidExperience';
+import StudentExperience from './StudentExperience';
+import { accrueSampleEarnings, createInitialPaperAccount, paperAccountValue, readPaperAccount, savePaperAccount, subscribePaperAccount } from './paperAccount';
+import { createKidMoney, KID_GUARDIAN_KEY, KID_MONEY_KEY, hashGuardianPin, readKidMoney, saveKidMoney } from './kidMoney.js';
 import { CashCalendar, DebtPlanner, sampleDebtPayments } from './PlanningTools';
 import './styles.css';
 import './planning.css';
@@ -61,6 +64,11 @@ function readPalette() {
   } catch { return 'green-light'; }
 }
 
+function readKidGuardian() {
+  try { return JSON.parse(window.localStorage.getItem(KID_GUARDIAN_KEY) || 'null'); }
+  catch { return null; }
+}
+
 function ThemePicker({ value, onChange }) {
   return <div className="theme-choice-grid" role="radiogroup" aria-label="Choose a colour theme">{themeOptions.map(option => <button type="button" role="radio" aria-checked={value === option.id} key={option.id} className={`theme-choice ${value === option.id ? 'selected' : ''}`} onClick={() => onChange(option.id)}><span className="theme-swatches">{option.swatches.map((color, index) => <i key={index} style={{ background: color }}/>)}</span><span><b>{option.name}</b><small>{option.mode === 'dark' ? 'Dark mode' : 'Light mode'}</small></span><span className="theme-radio">{value === option.id && <i/>}</span></button>)}</div>;
 }
@@ -77,17 +85,30 @@ function AccountSetup({ onCreate, palette, onPaletteChange }) {
     } catch { return ''; }
   });
   const [firstName, setFirstName] = useState('');
+  const [parentPin, setParentPin] = useState('');
   const [step, setStep] = useState(0);
+  const [createError, setCreateError] = useState('');
+  const [creating, setCreating] = useState(false);
   const audience = [
     { id: 'Kid', icon: '✦', title: 'Kid', copy: 'A friendly money-learning space with simple words and small goals.' },
     { id: 'Teen', icon: '↗', title: 'Teen', copy: 'Plan for school, first paychecks, saving goals, and future choices.' },
     { id: 'Adult', icon: '▤', title: 'Adult', copy: 'A clear, detailed view of cash flow, obligations, and portfolio decisions.' },
   ];
 
-  function create(event) {
+  async function create(event) {
     event.preventDefault();
-    if (!persona) return;
-    onCreate({ id: `account-${Date.now()}`, persona, firstName: firstName.trim().slice(0, 32), createdAt: new Date().toISOString() }, persona === 'Kid' ? 'green-light' : palette);
+    if (!persona || creating) return;
+    if (persona === 'Kid' && !/^\d{4}$/.test(parentPin)) return;
+    setCreating(true);
+    setCreateError('');
+    try {
+      const guardian = persona === 'Kid' ? await hashGuardianPin(parentPin) : null;
+      onCreate({ id: `account-${Date.now()}`, persona, firstName: firstName.trim().slice(0, 32), createdAt: new Date().toISOString() }, persona === 'Kid' ? 'green-light' : palette, guardian);
+    } catch {
+      setCreateError('We could not set up the parent code in this browser. Please try again.');
+    } finally {
+      setCreating(false);
+    }
   }
 
   function choosePersona(value) {
@@ -96,7 +117,7 @@ function AccountSetup({ onCreate, palette, onPaletteChange }) {
     catch { /* The selection remains available for this setup flow. */ }
   }
 
-  return <div className="account-setup-backdrop"><section className="account-setup" role="dialog" aria-modal="true" aria-labelledby="setup-title"><div className="setup-brand"><span className="brand-mark"><span/><span/><span/></span><b>velora</b></div><div className="setup-kicker">A FRESH START · STEP {step + 1} OF 2</div>{step === 0 ? <><h1 id="setup-title">Your money, on your terms.</h1><p className="setup-lede">Build a personal planning space from zero. Choose the experience that fits you. This creates a local simulation profile—not a bank, brokerage, or real-money account.</p><div className="setup-audiences">{audience.map(option => <button type="button" key={option.id} className={persona === option.id ? 'setup-audience selected' : 'setup-audience'} onClick={() => choosePersona(option.id)} aria-pressed={persona === option.id}><span className="setup-audience-icon">{option.icon}</span><span><b>{option.title}</b><small>{option.copy}</small></span><span className="setup-radio">{persona === option.id ? <i/> : null}</span></button>)}</div><button className="setup-continue" disabled={!persona} onClick={() => setStep(1)}>Continue <ArrowUpRight size={16}/></button><small className="setup-privacy"><LockKeyhole size={12}/> No sign-in required · your profile is saved in this browser</small></> : <form onSubmit={create}><h1 id="setup-title">Let's make it yours{firstName.trim() ? `, ${firstName.trim()}` : ''}.</h1><p className="setup-lede">Your {persona.toLowerCase()} workspace starts with $0 cash, no holdings, and no invented bills. Add only the details you want to plan with.</p><label className="setup-name-field"><span>WHAT SHOULD WE CALL YOU? <small>OPTIONAL</small></span><input autoFocus value={firstName} onChange={event => setFirstName(event.target.value)} maxLength={32} placeholder="First name or nickname"/></label>{persona !== 'Kid' && <div className="setup-theme-picker"><b>Choose your colours</b><small>You can change these when you log in later.</small><ThemePicker value={palette} onChange={onPaletteChange}/></div>}<div className="setup-empty-account"><Wallet size={18}/><span><b>Starting balance: $0.00</b><small>No example portfolio, transactions, or loans will be pre-filled.</small></span></div><label className="setup-understanding"><input type="checkbox" required/><span>I understand this is an educational paper-investing simulation. It cannot place real trades or move real money.</span></label><div className="setup-buttons"><button className="setup-continue" type="submit">Create my account <ArrowUpRight size={16}/></button></div><small className="setup-privacy"><LockKeyhole size={12}/> Profile and preferences are stored locally on this device</small></form>}</section></div>;
+  return <div className="account-setup-backdrop"><section className={`account-setup${persona === 'Kid' ? ' kid-account-setup' : ''}`} role="dialog" aria-modal="true" aria-labelledby="setup-title"><div className="setup-brand"><span className="brand-mark"><span/><span/><span/></span><b>velora</b></div><div className="setup-kicker">A FRESH START · STEP {step + 1} OF 2</div>{step === 0 ? <><h1 id="setup-title">Your money, on your terms.</h1><p className="setup-lede">Build a personal planning space from zero. Choose the experience that fits you. This creates a local simulation profile—not a bank, brokerage, or real-money account.</p><div className="setup-audiences">{audience.map(option => <button type="button" key={option.id} className={persona === option.id ? 'setup-audience selected' : 'setup-audience'} onClick={() => choosePersona(option.id)} aria-pressed={persona === option.id}><span className="setup-audience-icon">{option.icon}</span><span><b>{option.title}</b><small>{option.copy}</small></span><span className="setup-radio">{persona === option.id ? <i/> : null}</span></button>)}</div><button className="setup-continue" disabled={!persona} onClick={() => setStep(1)}>Continue <ArrowUpRight size={16}/></button><small className="setup-privacy"><LockKeyhole size={12}/> No sign-in required · your profile is saved in this browser</small></> : <form onSubmit={create}><h1 id="setup-title">Let's make it yours{firstName.trim() ? `, ${firstName.trim()}` : ''}.</h1><p className="setup-lede">Your {persona.toLowerCase()} workspace starts with $0 cash and no made-up transactions. Add only the details you want to plan with.</p><label className="setup-name-field"><span>WHAT SHOULD WE CALL YOU? <small>OPTIONAL</small></span><input autoFocus value={firstName} onChange={event => setFirstName(event.target.value)} maxLength={32} placeholder="First name or nickname"/></label>{persona === 'Kid' && <label className="setup-name-field"><span>PARENT APPROVAL CODE</span><input type="password" inputMode="numeric" pattern="[0-9]{4}" maxLength={4} value={parentPin} onChange={event => setParentPin(event.target.value.replace(/\D/g, '').slice(0, 4))} placeholder="Parent sets a 4-digit code" required/><small>A parent or guardian uses this to add allowance and approve investing requests.</small></label>}{persona !== 'Kid' && <div className="setup-theme-picker"><b>Choose your colours</b><small>You can change these when you log in later.</small><ThemePicker value={palette} onChange={onPaletteChange}/></div>}<div className="setup-empty-account"><Wallet size={18}/><span><b>Starting balance: $0.00</b><small>No example portfolio, transactions, or loans will be pre-filled.</small></span></div><label className="setup-understanding"><input type="checkbox" required/><span>I understand this is an educational paper-investing simulation. It cannot place real trades or move real money.</span></label>{createError && <p className="setup-error" role="alert">{createError}</p>}<div className="setup-buttons"><button className="setup-continue" type="submit" disabled={creating}>{creating ? 'Setting things up…' : 'Create my account'} <ArrowUpRight size={16}/></button></div><small className="setup-privacy"><LockKeyhole size={12}/> Profile and preferences are stored locally on this device</small></form>}</section></div>;
 }
 
 function CashFlowChart({ forecast, reserve }) {
@@ -224,10 +245,12 @@ function PaperTradeAgent({ plan, asset, cadence, rails, forecast, safeSurplus, r
 function App() {
   const [accountProfile, setAccountProfile] = useState(readActiveAccountProfile);
   const persona = accountProfile?.persona || 'Adult';
-  const [activePage, setActivePage] = useState('Wealth');
+  const [activePage, setActivePage] = useState(() => readActiveAccountProfile()?.persona === 'Kid' ? 'KidHome' : 'Overview');
   const [selectedPalette, setSelectedPalette] = useState(readPalette);
   const [darkMode, setDarkMode] = useState(() => themeOptions.find(option => option.id === readPalette())?.mode === 'dark');
   const [paperAccount, setPaperAccount] = useState(readPaperAccount);
+  const [kidMoney, setKidMoney] = useState(readKidMoney);
+  const [kidGuardian, setKidGuardian] = useState(readKidGuardian);
   const [purchase, setPurchase] = useState(0);
   const [purchaseInput, setPurchaseInput] = useState('');
   const [cancelled, setCancelled] = useState([]);
@@ -306,6 +329,10 @@ function App() {
   useEffect(() => subscribePaperAccount(setPaperAccount), []);
 
   useEffect(() => {
+    if (persona === 'Kid') saveKidMoney(kidMoney);
+  }, [kidMoney, persona]);
+
+  useEffect(() => {
     if (!accountProfile?.demo || linkedAccount) return undefined;
     const accrue = () => {
       const current = readPaperAccount();
@@ -338,19 +365,32 @@ function App() {
     setDarkMode(nextMode === 'dark');
   }
 
-  function createAccount(profile, paletteId) {
+  function createAccount(profile, paletteId, guardian = null) {
     window.localStorage.setItem('velora-account-profile', JSON.stringify(profile));
     window.localStorage.removeItem('velora-session-ended');
+    const emptyPaperAccount = { ...createInitialPaperAccount(), bankCash: 0, cash: 0, budget: 0, earningsStartAt: null };
+    if (profile.persona === 'Kid') {
+      window.localStorage.setItem(KID_GUARDIAN_KEY, JSON.stringify(guardian));
+      setKidGuardian(guardian);
+      saveKidMoney(createKidMoney());
+      setKidMoney(createKidMoney());
+    } else {
+      window.localStorage.removeItem(KID_GUARDIAN_KEY);
+      window.localStorage.removeItem(KID_MONEY_KEY);
+      setKidGuardian(null);
+      setKidMoney(createKidMoney());
+    }
     if (profile.persona !== 'Kid') applyPalette(paletteId || selectedPalette);
     window.localStorage.setItem('velora-paper-portfolio', JSON.stringify({ cash: 0, positions: {}, orders: [] }));
     window.localStorage.setItem('velora-custom-events', '[]');
     window.localStorage.setItem('velora-debt-payments', JSON.stringify({ card: 0, student: 0, mortgage: 0 }));
     window.localStorage.removeItem('velora-auto-invest');
-    const initialPaperAccount = createInitialPaperAccount();
+    const initialPaperAccount = emptyPaperAccount;
     savePaperAccount(initialPaperAccount);
     setPaperAccount(initialPaperAccount);
     window.localStorage.removeItem('velora-onboarding-choice');
     setAccountProfile(profile);
+    setActivePage(profile.persona === 'Kid' ? 'KidHome' : profile.persona === 'Teen' ? 'StudentHome' : 'Overview');
     setPurchase(0);
     setPurchaseInput('');
     setCancelled([]);
@@ -375,11 +415,14 @@ function App() {
 
   function createNewAccount() {
     if (!window.confirm('Create a new account? This permanently replaces this browser’s local profile, paper holdings, order history, and plan settings.')) return;
-    for (const key of ['velora-account-profile', 'velora-paper-portfolio', 'velora-custom-events', 'velora-debt-payments', 'velora-auto-invest', 'velora-session-ended']) window.localStorage.removeItem(key);
-    const initialPaperAccount = createInitialPaperAccount();
+    for (const key of ['velora-account-profile', 'velora-paper-portfolio', 'velora-custom-events', 'velora-debt-payments', 'velora-auto-invest', 'velora-session-ended', KID_MONEY_KEY, KID_GUARDIAN_KEY]) window.localStorage.removeItem(key);
+    const initialPaperAccount = { ...createInitialPaperAccount(), bankCash: 0, cash: 0, budget: 0, earningsStartAt: null };
     savePaperAccount(initialPaperAccount);
     setPaperAccount(initialPaperAccount);
     setAccountProfile(null);
+    setKidMoney(createKidMoney());
+    setKidGuardian(null);
+    setActivePage('Overview');
     setPurchase(0);
     setPurchaseInput('');
     setCancelled([]);
@@ -408,7 +451,7 @@ function App() {
     window.localStorage.removeItem('velora-session-ended');
     if (profile.persona !== 'Kid') applyPalette(selectedPalette);
     setAccountProfile(profile);
-    setActivePage('Overview');
+    setActivePage(profile.persona === 'Kid' ? 'KidHome' : profile.persona === 'Teen' ? 'StudentHome' : 'Overview');
   }
 
   function logOut() {
@@ -499,7 +542,7 @@ function App() {
     }
   }
 
-  const pages = [
+  const adultPages = [
     { label: 'Wealth Manager', page: 'Wealth', icon: CircleDollarSign },
     { label: 'Overview', page: 'Overview', icon: LayoutDashboard },
     { label: 'AI Trading', page: 'Trading', icon: Activity },
@@ -509,6 +552,17 @@ function App() {
     { label: 'Tools', page: 'Tools', icon: Wrench },
     { label: 'Portfolio', page: 'Portfolio', icon: BriefcaseBusiness },
   ];
+  const studentPages = [
+    { label: 'Home', page: 'StudentHome', icon: LayoutDashboard },
+    { label: 'Practice investing', page: 'Portfolio', icon: BriefcaseBusiness },
+    { label: 'Advice & goals', page: 'WhatIf', icon: Sparkles },
+  ];
+  const kidPages = [
+    { label: 'My home', page: 'KidHome', icon: House },
+    { label: 'Allowance', page: 'KidAllowance', icon: Coins },
+    { label: 'Growing jar', page: 'KidInvest', icon: PiggyBank },
+  ];
+  const pages = persona === 'Kid' ? kidPages : persona === 'Teen' ? studentPages : adultPages;
   const activePageLabel = pages.find(item => item.page === activePage)?.label || activePage;
   const savedAccount = readAccountProfile();
 
@@ -516,16 +570,18 @@ function App() {
     <aside className="sidebar">
       <a className="brand sidebar-brand" href="#top" aria-label="Velora overview"><span className="brand-mark"><span/><span/><span/></span><span>velora</span></a>
       <div className="sidebar-section-label">WORKSPACE</div>
-      <nav className="sidebar-nav" aria-label="Main navigation">{pages.map(({ label, page, icon: Icon }) => <button key={page} className={activePage === page ? 'sidebar-link active' : 'sidebar-link'} onClick={() => setActivePage(page)} aria-current={activePage === page ? 'page' : undefined}><Icon size={18}/><span>{persona === 'Kid' && label === 'Portfolio' ? 'My stocks' : label}</span></button>)}</nav>
-      {persona === 'Kid' && <div className="kid-glossary"><b>Money words</b><p><strong>Stock</strong> · a tiny piece of a company.</p><p><strong>Price</strong> · what one piece costs right now.</p><p><strong>Paper money</strong> · pretend dollars for practice.</p><p><strong>Risk</strong> · the chance your pretend money goes down.</p></div>}
+      <nav className="sidebar-nav" aria-label="Main navigation">{pages.map(({ label, page, icon: Icon }) => <button key={page} className={activePage === page ? 'sidebar-link active' : 'sidebar-link'} onClick={() => setActivePage(page)} aria-current={activePage === page ? 'page' : undefined}><Icon size={18}/><span>{label}</span></button>)}</nav>
+      {persona === 'Kid' && <div className="kid-sidebar-note"><Sparkles size={14}/><span>Little steps make<br/>big money skills.</span></div>}
       <div className="sidebar-bottom"><button className="theme-toggle" onClick={toggleColorMode}><span className="theme-toggle-icon">{darkMode ? <Sun size={16}/> : <Moon size={16}/>}</span>{darkMode ? 'Light mode' : 'Dark mode'}</button><div className="sidebar-profile"><span className="locked-account-avatar">{activePage === 'Wealth' ? 'V' : (accountProfile?.firstName || persona).slice(0, 1).toUpperCase()}</span><span><b>{activePage === 'Wealth' ? 'Demo personas' : accountProfile?.firstName || `${persona} account`}</b><small>{activePage === 'Wealth' ? 'Aisha · Marcus · Elena' : `${persona} account`}</small></span></div></div>
     </aside>
     <div className="workspace">
     <header className="topbar">
-      <div className="top-actions"><span className="status"><i/> {activePage === 'Wealth' ? 'Simulated market ready' : linkedAccount ? 'Plaid Sandbox linked' : 'Demo bank ready'}</span><span className="engine"><Sparkles size={13}/> {activePage === 'Wealth' ? 'AI simulation' : `AI ${aiStatus === 'live' ? 'connected' : aiStatus === 'demo' ? 'rules fallback' : 'ready'}`}</span>{activePage !== 'Wealth' && persona !== 'Kid' && (accountProfile || savedAccount) && <button className="session-button" onClick={accountProfile ? logOut : logIn}>{accountProfile ? 'Log out' : 'Log in'}</button>}{activePage !== 'Wealth' && <button className="new-account-button" onClick={createNewAccount}>New account</button>}<button className="icon-btn" aria-label="Notifications"><Bell size={18}/></button><button className="avatar" aria-label="Account profile">{activePage === 'Wealth' ? 'V' : (accountProfile?.firstName || persona).slice(0, 1).toUpperCase()}</button></div>
+      <div className="top-actions">{persona !== 'Kid' && <><span className="status"><i/> {activePage === 'Wealth' ? 'Simulated market ready' : linkedAccount ? 'Sandbox linked' : 'Practice account'}</span><span className="engine"><Sparkles size={13}/> {activePage === 'Wealth' ? 'AI simulation' : `AI ${aiStatus === 'live' ? 'connected' : aiStatus === 'demo' ? 'rules fallback' : 'ready'}`}</span></>}{activePage !== 'Wealth' && persona !== 'Kid' && (accountProfile || savedAccount) && <button className="session-button" onClick={accountProfile ? logOut : logIn}>{accountProfile ? 'Log out' : 'Log in'}</button>}{activePage !== 'Wealth' && persona === 'Adult' && <button className="new-account-button" onClick={createNewAccount}>New account</button>}{persona !== 'Kid' && <button className="icon-btn" aria-label="Notifications"><Bell size={18}/></button>}<button className="avatar" aria-label="Account profile">{(accountProfile?.firstName || persona).slice(0, 1).toUpperCase()}</button></div>
     </header>
     <main id="top" className="dashboard">
-      <div className="page-title-row" style={{ display: activePage === 'Wealth' ? 'none' : undefined }}><div><div className="eyebrow">{activePage === 'Trading' ? 'YOUR AI MONEY ASSISTANT' : activePageLabel.toUpperCase()}</div><h1>{activePage === 'Overview' ? (accountProfile?.firstName ? `Welcome, ${accountProfile.firstName}` : displayName) : activePage === 'Trading' ? 'AI ideas, with your say' : activePageLabel}</h1><p>{activePage === 'Overview' ? personaCopy : activePage === 'Trading' ? 'A sample account is ready. Choose an amount and comfort level. AI explains each idea; you approve every practice order.' : activePage === 'WhatIf' ? 'Explore how a goal or purchase could affect your account, then get age-appropriate ideas from your coach.' : activePage === 'Portfolio' ? 'Your practice cash, stocks, and recent decisions.' : activePage === 'Markets' ? 'Explore live prices and company details.' : activePage === 'Planning' ? 'Plan upcoming money in and money out.' : activePage === 'Tools' ? 'Explore guarded tools for your practice account.' : activePage}</p></div><span className="page-persona-tag">{linkedAccount ? 'Plaid Sandbox' : 'Demo account'} · {persona}</span></div>
+      <div className="page-title-row" style={{ display: activePage === 'Wealth' || activePage === 'KidHome' || activePage === 'KidAllowance' || activePage === 'KidInvest' || activePage === 'StudentHome' ? 'none' : undefined }}><div><div className="eyebrow">{activePage === 'Trading' ? 'YOUR AI MONEY ASSISTANT' : activePage === 'WhatIf' && persona === 'Teen' ? 'STUDENT COACH' : activePageLabel.toUpperCase()}</div><h1>{activePage === 'Overview' ? (accountProfile?.firstName ? `Welcome, ${accountProfile.firstName}` : displayName) : activePage === 'Trading' ? 'AI ideas, with your say' : activePageLabel}</h1><p>{activePage === 'Overview' ? personaCopy : activePage === 'Trading' ? 'A sample account is ready. Choose an amount and comfort level. AI explains each idea; you approve every practice order.' : activePage === 'WhatIf' && persona === 'Teen' ? 'Ask a question about saving, spending, or an investing goal. Velora explains the trade-offs in plain language.' : activePage === 'WhatIf' ? 'Explore how a goal or purchase could affect your account, then get age-appropriate ideas from your coach.' : activePage === 'Portfolio' ? 'Your practice cash, stocks, and recent decisions.' : activePage === 'Markets' ? 'Explore simulated prices and company details.' : activePage === 'Planning' ? 'Plan upcoming money in and money out.' : activePage === 'Tools' ? 'Explore guarded tools for your practice account.' : activePage}</p></div><span className="page-persona-tag">{linkedAccount ? 'Sandbox' : 'Practice account'} · {persona}</span></div>
+      {persona === 'Kid' && <KidExperience page={activePage} name={accountProfile?.firstName} state={kidMoney} setState={setKidMoney} guardian={kidGuardian} onNavigate={setActivePage}/>}
+      {activePage === 'StudentHome' && <StudentExperience name={accountProfile?.firstName} cash={paperAccountValue(paperAccount)} safeSurplus={safeSurplus} onNavigate={setActivePage}/>}
       <div className="page-content">
       {activePage === 'Wealth' && <WealthManager/>}
       <div style={{ display: activePage === 'Trading' ? 'block' : 'none' }} aria-hidden={activePage !== 'Trading'}><TradingDesk key={accountProfile?.id || 'no-account'} autoStart={Boolean(accountProfile)} onAiStatus={setAiStatus}/></div>
@@ -555,9 +611,9 @@ function App() {
       <section className="panel subscriptions-panel"><div className="section-title"><div className="section-icon coral-icon"><CreditCard size={18}/></div><div><div className="eyebrow">RECURRING EXPENSES</div><h2>Your recurring charges.</h2></div></div>{recurringTotal > 0 ? <><div className="subscription-total"><span>Monthly total</span><b>{money(recurringTotal,2)}<small>/mo</small></b></div><div className="subscription-list">{subscriptions.map(item => {const isCancelled=cancelled.includes(item.name);return <div className={isCancelled?'subscription canceled':'subscription'} key={item.name}><div className="service-icon" style={{'--service':item.color}}>{item.icon}</div><div className="service-name"><b>{item.name}</b><small>{isCancelled?'Cancellation simulated':item.detail}</small></div><div className="service-cost">{money(item.amount,2)}<small>/mo</small></div><button className={isCancelled?'toggle on':'toggle'} onClick={() => setCancelled(isCancelled ? cancelled.filter(name => name !== item.name) : [...cancelled, item.name])} aria-label={`${isCancelled?'Restore':'Simulate cancellation'} ${item.name}`}><i/></button></div>})}</div></> : <div className="subscriptions-empty"><CreditCard size={18}/><span><b>No recurring charges added</b><small>Your account is empty by design. Add expected bills to the payment calendar when you’re ready.</small></span></div>}<div className="nudge"><div className="nudge-spark"><Sparkles size={15}/></div><div><span className="nudge-label">PLAN INSIGHT</span><p>{recurringTotal ? 'Recurring charges are planning examples; changing a toggle never modifies a service account.' : 'Once you add recurring items, the forecast and cash-reserve checks will update automatically.'}</p></div></div></section>
       </div>}
       </div>
-      <footer className="page-footer"><span><LockKeyhole size={13}/> {activePage === 'Wealth' ? 'Three saved simulated accounts' : `Demo bank · sample balance ${money(paperAccount.bankCash)}`}</span><span>Practice orders only · no real funds move</span><span className="footer-right">Built for clearer decisions</span></footer>
+      <footer className="page-footer"><span><LockKeyhole size={13}/> {persona === 'Kid' ? 'Your practice money is pretend' : activePage === 'Wealth' ? 'Three saved simulated accounts' : `Practice account · ${money(paperAccount.bankCash)} cash`}</span><span>{persona === 'Kid' ? 'A grown-up approves your investing requests' : 'Practice orders only · no real funds move'}</span><span className="footer-right">{persona === 'Kid' ? 'Keep learning, money explorer!' : 'Built for clearer decisions'}</span></footer>
     </main>
-    <div className="disclaimer"><span><ShieldCheck size={15}/> <b>Paper investing only.</b> This educational simulation cannot place real trades, move money, or provide formal financial advice.</span></div>
+    <div className="disclaimer"><span><ShieldCheck size={15}/> <b>{persona === 'Kid' ? 'Pretend money only.' : 'Paper investing only.'}</b> {persona === 'Kid' ? 'Nothing here uses real money. A grown-up approves your practice investing.' : 'This educational simulation cannot place real trades, move money, or provide formal financial advice.'}</span></div>
     </div>
     {!accountProfile && (savedAccount ? <LocalLogin profile={savedAccount} palette={selectedPalette} onPaletteChange={applyPalette} onLogin={logIn}/> : <AccountSetup onCreate={createAccount} palette={selectedPalette} onPaletteChange={applyPalette}/>)}
   </div>;
