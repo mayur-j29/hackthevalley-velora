@@ -51,7 +51,7 @@ export default function TradingDesk({ persona = 'Teen' }) {
   const [error, setError] = useState('');
   const [updatedAt, setUpdatedAt] = useState(null);
   const [orderValue, setOrderValue] = useState('100');
-  const [fundAmount, setFundAmount] = useState('');
+  const [buyAmountMode, setBuyAmountMode] = useState('dollars');
   const [orderSide, setOrderSide] = useState('buy');
   const [stockQuery, setStockQuery] = useState('');
   const [directory, setDirectory] = useState([]);
@@ -73,7 +73,17 @@ export default function TradingDesk({ persona = 'Teen' }) {
     return sum + (toCad(holding.mark, holding.currency) - entryCostCad) * holding.shares;
   }, 0);
   const profit = (Number(account.realizedPnl) || 0) + openPnl;
+  const accountCash = cents((Number(account.bankCash) || 0) + (Number(account.cash) || 0));
   const position = account.positions?.[selected] || { shares: 0, entryPrice: 0 };
+  const orderCurrency = quote?.currency || (selected.endsWith(':TSX') ? 'CAD' : 'USD');
+  const orderPriceCad = price * (orderCurrency === 'CAD' ? 1 : fxRate || 0);
+  const enteredAmount = Number(orderValue) || 0;
+  const estimatedShares = orderSide === 'buy' ? buyAmountMode === 'dollars' ? orderPriceCad ? enteredAmount / orderPriceCad : 0 : enteredAmount : enteredAmount;
+  const orderEstimate = !price || enteredAmount <= 0
+    ? '—'
+    : orderSide === 'buy'
+      ? orderCurrency !== 'CAD' && !fxRate ? 'Waiting for USD/CAD rate' : buyAmountMode === 'dollars' ? `${estimatedShares.toFixed(6)} shares` : money(estimatedShares * orderPriceCad, 'CAD')
+      : orderCurrency !== 'CAD' && !fxRate ? 'Waiting for USD/CAD rate' : money(toCad(enteredAmount * price, orderCurrency), 'CAD');
 
   useEffect(() => { savePaperAccount(account); }, [account]);
   useEffect(() => {
@@ -128,39 +138,36 @@ export default function TradingDesk({ persona = 'Teen' }) {
     const held = current.positions?.[selected] || { shares: 0, entryPrice: 0 };
     const currency = quote?.currency || (selected.endsWith(':TSX') ? 'CAD' : 'USD');
     if (orderSide === 'buy') {
-      const spendCad = cents(quantity);
-      const shares = Number((spendCad / (price * (currency === 'CAD' ? 1 : fxRate))).toFixed(6)); const cost = cents(shares * price);
+      if (currency !== 'CAD' && !fxRate) return setError('The current USD/CAD rate is unavailable. Refresh prices before placing this order.');
+      const priceCad = price * (currency === 'CAD' ? 1 : fxRate);
+      const spendCad = buyAmountMode === 'dollars' ? cents(quantity) : cents(quantity * priceCad);
+      const shares = buyAmountMode === 'dollars' ? Number((spendCad / priceCad).toFixed(6)) : Number(quantity.toFixed(6));
+      const cost = cents(shares * price);
       const cadCost = cents(shares * price * (currency === 'CAD' ? 1 : fxRate));
-      if (cadCost > current.cash) return setError(`This order is larger than the available investing balance of ${money(current.cash, 'CAD')}.`);
+      const currentBalance = (Number(current.bankCash) || 0) + (Number(current.cash) || 0);
+      if (!shares) return setError('That dollar amount is too small to buy a share fraction.');
+      if (cadCost > currentBalance) return setError(`This order is larger than the available account balance of ${money(currentBalance, 'CAD')}.`);
       const totalShares = Number((held.shares + shares).toFixed(6));
       const nextEntryFx = currency === 'CAD' ? 1 : fxRate;
       const existingEntryCad = Number(held.entryCostCadPerShare) || held.entryPrice * (Number(held.entryFxUsdCad) || nextEntryFx);
       const entryCostCadPerShare = (held.shares * existingEntryCad + cadCost) / totalShares;
-      const next = { ...current, cash: cents(current.cash - cadCost), fxUsdCad: fxRate, positions: { ...current.positions, [selected]: { shares: totalShares, entryPrice: (held.shares * held.entryPrice + cost) / totalShares, entryFxUsdCad: currency === 'CAD' ? 1 : nextEntryFx, entryCostCadPerShare, mark: price, currency } }, fills: [{ id: `manual-${Date.now()}`, symbol: selected, side: 'buy', shares, price, currency, cadAmount: cadCost, time: new Date().toISOString() }, ...(current.fills || [])].slice(0, 60) };
+      const bankSpend = Math.min(Number(current.bankCash) || 0, cadCost);
+      const next = { ...current, bankCash: cents((Number(current.bankCash) || 0) - bankSpend), cash: cents((Number(current.cash) || 0) - (cadCost - bankSpend)), fxUsdCad: fxRate, positions: { ...current.positions, [selected]: { shares: totalShares, entryPrice: (held.shares * held.entryPrice + cost) / totalShares, entryFxUsdCad: currency === 'CAD' ? 1 : nextEntryFx, entryCostCadPerShare, mark: price, currency } }, fills: [{ id: `manual-${Date.now()}`, symbol: selected, side: 'buy', shares, price, currency, cadAmount: cadCost, time: new Date().toISOString() }, ...(current.fills || [])].slice(0, 60) };
       setAccount(next);
     } else {
+      if (currency !== 'CAD' && !fxRate) return setError('The current USD/CAD rate is unavailable. Refresh prices before placing this order.');
       const shares = Number(quantity.toFixed(6));
       if (shares > held.shares) return setError(`You have ${Number(held.shares || 0).toFixed(6)} ${ticker(selected)} shares available to sell.`);
       const proceeds = cents(shares * price); const cadProceeds = cents(proceeds * (currency === 'CAD' ? 1 : fxRate)); const entryCostCadPerShare = Number(held.entryCostCadPerShare) || held.entryPrice * (currency === 'CAD' ? 1 : Number(held.entryFxUsdCad) || fxRate); const pnlCad = cents(cadProceeds - shares * entryCostCadPerShare); const remaining = Number((held.shares - shares).toFixed(6));
       const positions = { ...current.positions };
       if (remaining > 0.000001) positions[selected] = { ...held, shares: remaining, mark: price }; else delete positions[selected];
-      setAccount({ ...current, cash: cents(current.cash + cadProceeds), fxUsdCad: fxRate, realizedPnl: cents((Number(current.realizedPnl) || 0) + pnlCad), positions, fills: [{ id: `manual-${Date.now()}`, symbol: selected, side: 'sell', shares, price, currency, cadAmount: cadProceeds, time: new Date().toISOString(), pnl: pnlCad }, ...(current.fills || [])].slice(0, 60) });
+      setAccount({ ...current, bankCash: cents((Number(current.bankCash) || 0) + cadProceeds), fxUsdCad: fxRate, realizedPnl: cents((Number(current.realizedPnl) || 0) + pnlCad), positions, fills: [{ id: `manual-${Date.now()}`, symbol: selected, side: 'sell', shares, price, currency, cadAmount: cadProceeds, time: new Date().toISOString(), pnl: pnlCad }, ...(current.fills || [])].slice(0, 60) });
     }
-  }
-
-  function moveCashToTrading(event) {
-    event.preventDefault();
-    const amount = cents(Number(fundAmount));
-    const current = readPaperAccount();
-    if (!Number.isFinite(amount) || amount <= 0) return setError('Enter an amount greater than zero.');
-    if (amount > current.bankCash) return setError(`Only ${money(current.bankCash)} is available in account cash.`);
-    const next = { ...current, bankCash: cents(current.bankCash - amount), cash: cents(current.cash + amount) };
-    setAccount(next); setFundAmount(''); setError('');
   }
 
   return <section className="trading-desk panel simple-trading manual-trading" aria-labelledby="manual-trading-title">
     <header className="manual-head"><div><div className="simple-kicker"><span className="simple-dot"/> MANUAL STOCK TRADING</div><h2 id="manual-trading-title">Trading</h2><p>Read live market candles and place your own paper buy or sell orders.</p></div><button type="button" className="manual-refresh" onClick={refreshPrices} disabled={loading}><RefreshCw size={16} className={loading ? 'manual-spin' : ''}/>{loading ? 'Updating' : 'Refresh prices'}</button></header>
-    <div className="manual-summary" aria-label="Account summary"><article><span><Wallet size={15}/> Trading cash</span><b>{money(account.cash, 'CAD')}</b><small>CAD available for orders</small></article><article><span><Activity size={15}/> Stock value</span><b>{needsFx && !fxRate ? '—' : money(stockValue, 'CAD')}</b><small>{needsFx && !fxRate ? 'Waiting for USD/CAD rate' : `${holdings.length} holdings · converted to CAD`}</small></article><article><span><ArrowUpFromLine size={15}/> Total profit / loss</span><b className={profit >= 0 ? 'desk-positive' : 'desk-negative'}>{profit >= 0 ? '+' : '−'}{money(Math.abs(profit), 'CAD')}</b><small>{needsFx && !fxRate ? 'Waiting for USD/CAD rate' : 'Realized + current holdings · CAD'}</small></article></div>
+    <div className="manual-summary" aria-label="Account summary"><article><span><Wallet size={15}/> Account cash</span><b>{money(accountCash, 'CAD')}</b><small>Full account balance · available for orders</small></article><article><span><Activity size={15}/> Stock value</span><b>{needsFx && !fxRate ? '—' : money(stockValue, 'CAD')}</b><small>{needsFx && !fxRate ? 'Waiting for USD/CAD rate' : `${holdings.length} holdings · converted to CAD`}</small></article><article><span><ArrowUpFromLine size={15}/> Total profit / loss</span><b className={needsFx && !fxRate ? '' : profit >= 0 ? 'desk-positive' : 'desk-negative'}>{needsFx && !fxRate ? '—' : `${profit >= 0 ? '+' : '−'}${money(Math.abs(profit), 'CAD')}`}</b><small>{needsFx && !fxRate ? 'Waiting for USD/CAD rate' : 'Realized + current holdings · CAD'}</small></article></div>
     {error && <div className="manual-error" role="alert">{error}</div>}
     <div className="manual-workspace">
       <div className="manual-market-panel">
@@ -172,10 +179,10 @@ export default function TradingDesk({ persona = 'Teen' }) {
       </div>
       <aside className="manual-order-panel"><div className="manual-order-heading"><span className="simple-icon"><Activity size={17}/></span><div><b>Place a paper order</b><small>{ticker(selected)} at {price ? money(price, quote?.currency || 'USD') : 'current market price'}</small></div></div>
         <div className="manual-side-switch" role="group" aria-label="Order type"><button type="button" className={orderSide === 'buy' ? 'active buy' : ''} onClick={() => { setOrderSide('buy'); setOrderValue('100'); }}>Buy</button><button type="button" className={orderSide === 'sell' ? 'active sell' : ''} onClick={() => { setOrderSide('sell'); setOrderValue(String(position.shares || '')); }}>Sell</button></div>
-        <form onSubmit={placeOrder} className="manual-order-form"><label htmlFor="manual-order-value">{orderSide === 'buy' ? 'Amount to spend (CAD)' : 'Shares to sell'}<span>{orderSide === 'buy' ? `Available ${money(account.cash, 'CAD')}` : `Owned ${Number(position.shares || 0).toFixed(4)}`}</span></label><div className="manual-order-input-wrap"><span>{orderSide === 'buy' ? 'CA$' : 'SH'}</span><input id="manual-order-value" type="number" min={orderSide === 'buy' ? '0.01' : '0.000001'} step={orderSide === 'buy' ? '0.01' : '0.000001'} max={orderSide === 'buy' ? account.cash : position.shares || 0} value={orderValue} onChange={event => setOrderValue(event.target.value)} placeholder="0.00"/></div><div className="manual-estimate"><span>Estimated {orderSide === 'buy' ? 'shares' : 'proceeds'}</span><b>{price && Number(orderValue) > 0 ? orderSide === 'buy' ? fxRate || (quote?.currency === 'CAD') ? `${(Number(orderValue) / (price * (quote?.currency === 'CAD' ? 1 : fxRate))).toFixed(6)} shares` : 'Waiting for USD/CAD rate' : fxRate || (quote?.currency === 'CAD') ? money(toCad(Number(orderValue) * price, quote?.currency || 'USD'), 'CAD') : 'Waiting for USD/CAD rate' : '—'}</b></div><button className={`manual-submit ${orderSide}`} type="submit" disabled={!price || ((quote?.currency || 'USD') !== 'CAD' && !fxRate)}>{orderSide === 'buy' ? <><ArrowDownToLine size={16}/> Buy {ticker(selected)}</> : <><ArrowUpFromLine size={16}/> Sell {ticker(selected)}</>}</button><small className="manual-order-note">{(quote?.currency || 'USD') === 'CAD' ? 'Prices and account balances are CAD.' : fxRate ? `US stock prices convert to CAD at ${fxRate.toFixed(4)} USD/CAD.` : 'Waiting for the latest USD/CAD rate before enabling US orders.'} Orders use the latest available price and update this account only.</small></form>
+        {orderSide === 'buy' && <div className="manual-buy-mode" role="group" aria-label="Buy by shares or dollars"><button type="button" className={buyAmountMode === 'shares' ? 'selected' : ''} onClick={() => { setBuyAmountMode('shares'); setOrderValue('1'); }}>Buy by shares</button><button type="button" className={buyAmountMode === 'dollars' ? 'selected' : ''} onClick={() => { setBuyAmountMode('dollars'); setOrderValue('100'); }}>Buy by dollars</button></div>}
+        <form onSubmit={placeOrder} className="manual-order-form"><label htmlFor="manual-order-value">{orderSide === 'buy' ? buyAmountMode === 'shares' ? 'Shares to buy' : 'Dollars to invest (CAD)' : 'Shares to sell'}<span>{orderSide === 'buy' ? `Account balance ${money(accountCash, 'CAD')}` : `Owned ${Number(position.shares || 0).toFixed(4)}`}</span></label><div className="manual-order-input-wrap"><span>{orderSide === 'sell' || buyAmountMode === 'shares' ? 'SH' : 'CA$'}</span><input id="manual-order-value" type="number" min={orderSide === 'buy' && buyAmountMode === 'dollars' ? '0.01' : '0.000001'} step={orderSide === 'buy' && buyAmountMode === 'dollars' ? '0.01' : '0.000001'} max={orderSide === 'sell' ? position.shares || 0 : buyAmountMode === 'shares' && orderPriceCad ? accountCash / orderPriceCad : buyAmountMode === 'dollars' ? accountCash : undefined} value={orderValue} onChange={event => setOrderValue(event.target.value)} placeholder={orderSide === 'buy' && buyAmountMode === 'dollars' ? '100.00' : '1'}/></div><div className="manual-estimate"><span>{orderSide === 'buy' ? 'Estimated shares' : 'Estimated proceeds'}</span><b>{orderEstimate}</b></div><button className={`manual-submit ${orderSide}`} type="submit" disabled={!price || (orderCurrency !== 'CAD' && !fxRate)}>{orderSide === 'buy' ? <><ArrowDownToLine size={16}/> Buy {ticker(selected)}</> : <><ArrowUpFromLine size={16}/> Sell {ticker(selected)}</>}</button><small className="manual-order-note">{orderCurrency === 'CAD' ? 'Prices and account balance are CAD.' : fxRate ? `US stock prices convert to CAD at ${fxRate.toFixed(4)} USD/CAD.` : 'Waiting for the latest USD/CAD rate before enabling US orders.'} Orders use the latest available price and update this account only.</small></form>
       </aside>
     </div>
-    <form className="manual-funding" onSubmit={moveCashToTrading}><div><span className="simple-icon"><Wallet size={17}/></span><span><b>Add account cash to trading</b><small>{money(account.bankCash, 'CAD')} available in your account cash balance</small></span></div><label><span>CA$</span><input type="number" min="0.01" max={account.bankCash} step="0.01" value={fundAmount} onChange={event => setFundAmount(event.target.value)} placeholder="Amount" aria-label="Amount of account cash to move to trading"/><small>CAD</small></label><button type="submit" disabled={!Number(account.bankCash) || !fundAmount}>Move to trading</button></form>
     <details className="manual-add-stock"><summary><Plus size={15}/> Add a stock</summary><form onSubmit={searchStocks}><div className="manual-search-row"><select aria-label="Stock exchanges to search" value={directoryExchange} onChange={event => setDirectoryExchange(event.target.value)}><option value="ALL">All supported exchanges</option><option>NYSE</option><option>NASDAQ</option><option>TSX</option></select><label><Search size={15}/><input value={stockQuery} onChange={event => setStockQuery(event.target.value)} placeholder="Search by ticker or company"/></label><button type="submit">Search</button></div></form>{directoryError && <p className="manual-directory-error">{directoryError}</p>}{directory.length > 0 && <div className="manual-directory">{directory.map(stock => { const symbol = `${stock.symbol}:${stock.exchange}`; return <button type="button" key={symbol} onClick={() => addStock(stock)}><span><b>{stock.symbol}</b><small>{stock.name}</small></span><span>{watchlist.includes(symbol) ? 'Selected' : 'Add'}</span></button>; })}</div>}</details>
     <section className="manual-holdings"><h3>Your holdings</h3>{holdings.length ? <div className="manual-holdings-table"><div className="manual-holding-row manual-holding-labels"><span>Stock</span><span>Shares</span><span>Market price</span><span>Value</span><span>Profit / loss</span></div>{holdings.map(holding => <div className="manual-holding-row" key={holding.symbol}><b>{ticker(holding.symbol)}</b><span>{holding.shares.toFixed(4)}</span><span>{money(holding.mark, holding.currency)}</span><span>{money(holding.value, holding.currency)}</span><strong className={holding.pnl >= 0 ? 'desk-positive' : 'desk-negative'}>{holding.pnl >= 0 ? '+' : '−'}{money(Math.abs(holding.pnl), holding.currency)}</strong></div>)}</div> : <div className="manual-empty">Your holdings will appear here after your first buy order.</div>}</section>
     {account.fills?.length > 0 && <section className="manual-orders"><h3>Recent orders</h3>{account.fills.slice(0, 5).map(fill => <div className="manual-order-row" key={fill.id}><span className={`manual-order-badge ${fill.side}`}>{fill.side}</span><b>{ticker(fill.symbol)}</b><span>{Number(fill.shares).toFixed(4)} shares</span><span>{money(fill.price, fill.symbol?.endsWith(':TSX') ? 'CAD' : 'USD')}</span><time>{new Date(fill.time).toLocaleString()}</time></div>)}</section>}
