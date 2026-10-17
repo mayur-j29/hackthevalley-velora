@@ -1,12 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Activity, ArrowDownLeft, ArrowUpRight, Bell, CalendarDays, Check, ChevronDown, CircleDollarSign, CircleHelp, Clock3, CreditCard, Landmark, LockKeyhole, ShieldCheck, Sparkles, TrendingDown, TrendingUp, Wallet, Wrench, X, LayoutDashboard, BriefcaseBusiness, Sun, Moon } from 'lucide-react';
+import { Activity, ArrowDownLeft, ArrowUpRight, Bell, BookOpenCheck, CalendarDays, Check, ChevronDown, CircleDollarSign, CircleHelp, Clock3, CreditCard, Landmark, LockKeyhole, ShieldCheck, Sparkles, TrendingDown, TrendingUp, Wallet, Wrench, X, LayoutDashboard, BriefcaseBusiness, Sun, Moon } from 'lucide-react';
 import { buildForecast, crashScenarios, evaluateSimulatedTrade, getSafeSurplus, simulateAutoInvest } from './finance';
 import MarketReplay from './MarketReplay';
 import PaperPortfolio from './PaperPortfolio';
 import TradingDesk from './TradingDesk';
 import WhatIfCoach from './WhatIfCoach';
 import WealthManager from './WealthManager';
+import KidLearning from './KidLearning';
 import { accrueSampleEarnings, createInitialPaperAccount, readPaperAccount, savePaperAccount, subscribePaperAccount } from './paperAccount';
 import { CashCalendar, DebtPlanner, sampleDebtPayments } from './PlanningTools';
 import './styles.css';
@@ -515,7 +516,7 @@ function App() {
     { label: 'Tools', page: 'Tools', icon: Wrench },
     { label: 'Portfolio', page: 'Portfolio', icon: BriefcaseBusiness },
   ];
-  const accountPages = persona === 'Kid' ? pages.filter(item => item.page !== 'Wealth') : pages;
+  const accountPages = persona === 'Kid' ? [...pages.filter(item => item.page !== 'Wealth'), { label: 'Learn', page: 'Learn', icon: BookOpenCheck }] : pages;
   const activePageLabel = accountPages.find(item => item.page === activePage)?.label || activePage;
   const savedAccount = readAccountProfile();
 
@@ -538,8 +539,9 @@ function App() {
       <div className="top-actions"><span className="status"><i/> {activePage === 'Wealth' ? 'Simulated market ready' : linkedAccount ? 'Plaid Sandbox linked' : 'Practice account ready'}</span><span className="engine"><Sparkles size={13}/> {activePage === 'Wealth' ? 'AI simulation' : `AI ${aiStatus === 'live' ? 'connected' : aiStatus === 'demo' ? 'rules fallback' : 'ready'}`}</span>{activePage !== 'Wealth' && persona !== 'Kid' && (accountProfile || savedAccount) && <button className="session-button" onClick={accountProfile ? logOut : logIn}>{accountProfile ? 'Log out' : 'Log in'}</button>}<button className="new-account-button" onClick={createNewAccount}>New account</button><button className="icon-btn" aria-label="Notifications"><Bell size={18}/></button><button className="avatar" aria-label="Account profile">{(accountProfile?.firstName || persona).slice(0, 1).toUpperCase()}</button></div>
     </header>
     <main id="top" className="dashboard">
-      {['Overview','Portfolio','Tools'].includes(activePage) && <div className="page-title-row"><div><div className="eyebrow">{activePageLabel.toUpperCase()}</div><h1>{activePage === 'Overview' ? (accountProfile?.firstName ? `Welcome, ${accountProfile.firstName}` : displayName) : activePageLabel}</h1><p>{activePage === 'Overview' ? personaCopy : activePage === 'Portfolio' ? 'Your practice cash, stocks, and recent decisions.' : 'Explore guarded tools for your practice account.'}</p></div><span className="page-persona-tag">{linkedAccount ? 'Plaid Sandbox' : 'Demo account'} · {persona}</span></div>}
+      {['Overview','Portfolio','Tools','Learn'].includes(activePage) && <div className="page-title-row"><div><div className="eyebrow">{activePageLabel.toUpperCase()}</div><h1>{activePage === 'Overview' ? (accountProfile?.firstName ? `Welcome, ${accountProfile.firstName}` : displayName) : activePageLabel}</h1><p>{activePage === 'Overview' ? personaCopy : activePage === 'Portfolio' ? 'Your practice cash, stocks, and recent decisions.' : activePage === 'Learn' ? 'Short, friendly lessons about money, stocks, and chart patterns.' : 'Explore guarded tools for your practice account.'}</p></div><span className="page-persona-tag">{linkedAccount ? 'Plaid Sandbox' : 'Demo account'} · {persona}</span></div>}
       <div className="page-content">
+      {activePage === 'Learn' && persona === 'Kid' && <KidLearning/>}
       {activePage === 'Wealth' && persona !== 'Kid' && <WealthManager userAccount={accountProfile}/>}
       <div style={{ display: activePage === 'Trading' ? 'block' : 'none' }} aria-hidden={activePage !== 'Trading'}><TradingDesk key={accountProfile?.id || 'no-account'} autoStart={Boolean(accountProfile)} onAiStatus={setAiStatus}/></div>
       {activePage === 'WhatIf' && <WhatIfCoach persona={persona} cash={whatIfCash - purchase} income={income} bills={bills} safeSurplus={safeSurplus} projectedLow={lowestBalance} reserve={reserve}/>}
