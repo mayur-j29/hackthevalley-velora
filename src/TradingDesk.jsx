@@ -1,15 +1,39 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Activity, CircleHelp, Landmark, Pause, Play, RotateCcw, ShieldCheck, Sparkles, TrendingUp, Wallet } from 'lucide-react';
-import { evaluateMovingAverageCrossover, getVolatilityProfile } from './finance';
+import { Activity, CircleHelp, Landmark, Pause, Play, Plus, RotateCcw, Search, ShieldCheck, Sparkles, TrendingUp, Wallet, X } from 'lucide-react';
+import { analyzeCandlestickPattern, evaluateMovingAverageCrossover, getVolatilityProfile } from './finance';
 import './trading-desk.css';
 import './trading-risk.css';
 import './simple-trading.css';
 
-const SYMBOLS = ['SPY', 'AAPL', 'MSFT', 'TSLA'];
+const DEFAULT_SYMBOLS = ['JPM:NYSE', 'KO:NYSE', 'RY:TSX', 'TD:TSX'];
 const START_BANK = 25000;
 const START_BUDGET = 5000;
 const cents = value => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 const money = value => `$${new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value) || 0)}`;
+const tickerName = symbol => symbol.split(':')[0];
+const exchangeName = symbol => symbol.endsWith(':TSX') ? 'TSX' : 'NYSE';
+
+function MiniCandles({ points = [] }) {
+  const candles = points.slice(-18);
+  if (candles.length < 2) return <div className="simple-candle-empty">Waiting for candle history…</div>;
+  const low = Math.min(...candles.map(item => item.low));
+  const high = Math.max(...candles.map(item => item.high));
+  const y = price => 66 - ((price - low) / Math.max(0.0001, high - low)) * 56;
+  const step = 240 / candles.length;
+  return <svg className="simple-candle-chart" viewBox="0 0 240 72" role="img" aria-label={`Recent candlestick chart for ${candles.at(-1).symbol || 'stock'}`}>
+    {[15, 36, 57].map(level => <line key={level} x1="0" x2="240" y1={level} y2={level} className="simple-candle-gridline"/>)}
+    {candles.map((candle, index) => {
+      const color = candle.close >= candle.open ? 'up' : 'down';
+      const top = Math.min(y(candle.open), y(candle.close));
+      const height = Math.max(1.5, Math.abs(y(candle.close) - y(candle.open)));
+      const center = index * step + step / 2;
+      return <g className={`simple-candle ${color}`} key={`${candle.date}-${index}`}>
+        <line x1={center} x2={center} y1={y(candle.high)} y2={y(candle.low)}/>
+        <rect x={center - Math.max(2, step * 0.27)} y={top} width={Math.max(4, step * 0.54)} height={height} rx="1"/>
+      </g>;
+    })}
+  </svg>;
+}
 
 function createAccount() {
   try {
@@ -23,7 +47,25 @@ function createAccount() {
 
 export default function TradingDesk({ autoStart = true }) {
   const [account, setAccount] = useState(createAccount);
+  const [watchlist, setWatchlist] = useState(() => {
+    try {
+      const saved = JSON.parse(window.localStorage.getItem('velora-trading-watchlist') || 'null');
+      if (Array.isArray(saved) && saved.length) {
+        const migrated = saved.map(value => String(value).includes(':') ? String(value) : `${String(value).replace(/\.TO$/i, '')}:${String(value).endsWith('.TO') ? 'TSX' : 'NYSE'}`);
+        const supported = migrated.filter(value => /^[A-Z0-9.-]{1,15}:(NYSE|TSX)$/.test(value));
+        if (supported.length) return [...new Set(supported)].slice(0, 10);
+      }
+    } catch { /* Use the starter symbols. */ }
+    return DEFAULT_SYMBOLS;
+  });
   const [markets, setMarkets] = useState({});
+  const [directoryExchange, setDirectoryExchange] = useState('NYSE');
+  const [directoryQuery, setDirectoryQuery] = useState('');
+  const [directoryResults, setDirectoryResults] = useState([]);
+  const [directoryPage, setDirectoryPage] = useState(1);
+  const [directoryBusy, setDirectoryBusy] = useState(false);
+  const [directoryError, setDirectoryError] = useState('');
+  const [aiStatus, setAiStatus] = useState('Waiting for scan');
   const [volatility, setVolatility] = useState(() => createAccount().volatility ?? 35);
   const [budget, setBudget] = useState(() => createAccount().budget ?? START_BUDGET);
   const [running, setRunning] = useState(autoStart);
@@ -35,10 +77,15 @@ export default function TradingDesk({ autoStart = true }) {
   const accountRef = useRef(account);
   const volatilityRef = useRef(volatility);
   const budgetRef = useRef(budget);
+  const watchlistRef = useRef(watchlist);
   const busyRef = useRef(false);
   const processedBarsRef = useRef({});
   const risk = useMemo(() => getVolatilityProfile(volatility), [volatility]);
-  const prices = useMemo(() => Object.fromEntries(SYMBOLS.map(symbol => [symbol, Number(markets[symbol]?.points?.at(-1)?.close) || 0])), [markets]);
+  const prices = useMemo(() => Object.fromEntries(watchlist.map(symbol => [symbol, Number(markets[symbol]?.points?.at(-1)?.close) || 0])), [markets, watchlist]);
+  const analyses = useMemo(() => Object.fromEntries(watchlist.map(symbol => {
+    const quote = markets[symbol]; const points = quote?.points || []; const pattern = analyzeCandlestickPattern(points);
+    return [symbol, { pattern, quote, price: Number(points.at(-1)?.close) || 0, action: account.decisions?.find(item => item.symbol === symbol)?.action || 'SCANNING' }];
+  })), [account.decisions, markets, watchlist]);
   const holdings = Object.entries(account.positions).map(([symbol, position]) => {
     const price = prices[symbol] || position.mark || position.entryPrice;
     const marketValue = position.shares * price;
@@ -52,21 +99,42 @@ export default function TradingDesk({ autoStart = true }) {
   useEffect(() => { accountRef.current = account; }, [account]);
   useEffect(() => { volatilityRef.current = volatility; }, [volatility]);
   useEffect(() => { budgetRef.current = budget; }, [budget]);
+  useEffect(() => { watchlistRef.current = watchlist; try { window.localStorage.setItem('velora-trading-watchlist', JSON.stringify(watchlist)); } catch { /* Watchlist stays active for this session. */ } }, [watchlist]);
   useEffect(() => {
     try { window.localStorage.setItem('velora-simple-paper-account', JSON.stringify({ ...account, budget, volatility })); }
     catch { /* Keep this practice account usable for the current session. */ }
   }, [account, budget, volatility]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setDirectoryBusy(true);
+    setDirectoryError('');
+    const timer = window.setTimeout(async () => {
+      try {
+        const params = new URLSearchParams({ exchange: directoryExchange, page: String(directoryPage) });
+        if (directoryQuery.trim()) params.set('q', directoryQuery.trim());
+        const result = await fetch(`/api/stocks?${params}`, { signal: controller.signal });
+        const data = await result.json();
+        if (!result.ok || !Array.isArray(data.stocks)) throw new Error(data.error || 'Stock directory is unavailable.');
+        setDirectoryResults(current => directoryPage === 1 ? data.stocks : [...current, ...data.stocks.filter(stock => !current.some(old => old.symbol === stock.symbol))]);
+      } catch (directoryFetchError) {
+        if (!controller.signal.aborted) { setDirectoryResults([]); setDirectoryError(directoryFetchError.message || 'Stock directory is unavailable.'); }
+      } finally { if (!controller.signal.aborted) setDirectoryBusy(false); }
+    }, directoryQuery.trim() ? 250 : 0);
+    return () => { window.clearTimeout(timer); controller.abort(); };
+  }, [directoryExchange, directoryPage, directoryQuery]);
 
   async function scanMarket(signal) {
     if (busyRef.current) return;
     busyRef.current = true;
     setLoading(true);
     try {
-      const response = await fetch(`/api/market?symbols=${SYMBOLS.join(',')}&range=1d`, { signal });
+      const symbols = watchlistRef.current;
+      const response = await fetch(`/api/market?symbols=${symbols.map(encodeURIComponent).join(',')}`, { signal });
       const payload = await response.json();
       if (!response.ok || !Array.isArray(payload.quotes)) throw new Error(payload.error || 'Prices are temporarily unavailable.');
       const nextMarkets = Object.fromEntries(payload.quotes
-        .filter(quote => Array.isArray(quote.points) && quote.points.length >= 8)
+        .filter(quote => Array.isArray(quote.points) && quote.points.length >= 2)
         .map(quote => [quote.symbol, quote]));
       if (!Object.keys(nextMarkets).length) throw new Error('No current market-price history is available yet. Try again during market hours.');
       setMarkets(nextMarkets);
@@ -77,9 +145,10 @@ export default function TradingDesk({ autoStart = true }) {
       const newFills = [];
       const newDecisions = [];
       const activeRisk = getVolatilityProfile(volatilityRef.current);
-      for (const symbol of SYMBOLS) {
+      const candidates = [];
+      for (const symbol of symbols) {
         const points = nextMarkets[symbol]?.points || [];
-        if (points.length < activeRisk.slowWindow + 1) continue;
+        if (points.length < 2) continue;
         const latest = points.at(-1);
         const barTime = latest.date;
         if (!barTime || processedBarsRef.current[symbol] === barTime) continue;
@@ -94,14 +163,37 @@ export default function TradingDesk({ autoStart = true }) {
           activeRisk.fastWindow,
           activeRisk.slowWindow,
         );
+        const pattern = analyzeCandlestickPattern(points);
+        candidates.push({ symbol, exchange: exchangeName(symbol), currency: nextMarkets[symbol]?.currency, candles: points.slice(-20), pattern, held: position.shares > 0, shares: position.shares, signal });
+      }
+      let aiDecisions = {};
+      if (candidates.length) {
+        try {
+          const aiResponse = await fetch('/api/trading-ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, signal, body: JSON.stringify({ riskLevel: activeRisk.label, cash: nextAccount.cash, candidates }) });
+          const aiPayload = await aiResponse.json();
+          if (!aiResponse.ok || !Array.isArray(aiPayload.decisions)) throw new Error(aiPayload.error || 'AI scan unavailable');
+          aiDecisions = Object.fromEntries(aiPayload.decisions.map(item => [item.symbol, item]));
+          setAiStatus('Gemini candle review');
+        } catch (aiError) {
+          if (signal?.aborted) throw aiError;
+          setAiStatus('Rules fallback · Gemini unavailable');
+        }
+      }
+      for (const candidate of candidates) {
+        const { symbol, pattern, signal } = candidate;
+        const points = nextMarkets[symbol].points;
+        const price = candidate.candles.at(-1).close;
+        const position = nextAccount.positions[symbol] || { shares: 0, entryPrice: 0 };
         const stopTriggered = position.shares > 0 && price <= position.entryPrice * (1 - activeRisk.stopLossPct);
-        let action = stopTriggered ? 'sell' : signal;
-        let reason = action === 'buy'
-          ? `Buy rule: the ${activeRisk.fastWindow}-minute average crossed above the ${activeRisk.slowWindow}-minute average.`
-          : action === 'sell'
-            ? stopTriggered ? `Sell rule: the ${money(position.entryPrice)} entry reached the ${(activeRisk.stopLossPct * 100).toFixed(1)}% practice stop.` : 'Sell rule: the fast average crossed below the slow average.'
-            : position.shares > 0 ? 'Hold: no sell rule has triggered.' : 'Wait: no buy rule has triggered.';
-        if (action === 'buy' && nextAccount.cash > 1) {
+        const suggestion = aiDecisions[symbol];
+        const fallback = signal === 'buy' && pattern.bias === 'bullish' ? 'BUY' : signal === 'sell' && position.shares > 0 ? 'SELL' : 'HOLD';
+        let action = stopTriggered ? 'SELL' : suggestion?.action || fallback;
+        let reason = stopTriggered
+          ? `Safety exit: price reached the ${(activeRisk.stopLossPct * 100).toFixed(1)}% limit.`
+          : suggestion?.reason || `${pattern.name}: ${pattern.explanation} Moving-average check: ${signal}.`;
+        if (action === 'BUY' && pattern.bias !== 'bullish') { action = 'HOLD'; reason = `Risk check blocked the buy: ${pattern.name} is not bullish. ${reason}`; }
+        if (action === 'SELL' && position.shares <= 0) { action = 'HOLD'; reason = 'Risk check blocked the sell: there is no practice holding to sell.'; }
+        if (action === 'BUY' && nextAccount.cash > 1) {
           const currentValue = position.shares * price;
           const currentPortfolioValue = nextAccount.cash + Object.entries(nextAccount.positions).reduce((sum, [ticker, held]) => sum + (Number(nextMarkets[ticker]?.points?.at(-1)?.close) || held.mark || held.entryPrice) * held.shares, 0);
           const limit = Math.min(budgetRef.current, currentPortfolioValue || budgetRef.current) * activeRisk.maxPositionPct;
@@ -120,12 +212,12 @@ export default function TradingDesk({ autoStart = true }) {
             reason += ` Practice order: ${shares.toFixed(4)} shares for ${money(cost)}.`;
           } else {
             reason = 'Wait: this stock is already at its selected portfolio limit.';
-            action = 'wait';
+            action = 'HOLD';
           }
-        } else if (action === 'buy') {
+        } else if (action === 'BUY') {
           reason = 'Wait: there is no investing cash available for this practice order.';
-          action = 'wait';
-        } else if (action === 'sell' && position.shares > 0) {
+          action = 'HOLD';
+        } else if (action === 'SELL' && position.shares > 0) {
           const proceeds = position.shares * price;
           const tradePnl = (price - position.entryPrice) * position.shares;
           nextAccount.cash = cents(nextAccount.cash + proceeds);
@@ -134,7 +226,7 @@ export default function TradingDesk({ autoStart = true }) {
           newFills.push({ id: `${symbol}-${barTime}-sell`, symbol, side: 'sell', shares: position.shares, price, time: barTime, reason, pnl: tradePnl });
           reason += ` Practice sale: ${money(proceeds)}; result ${tradePnl >= 0 ? '+' : '−'}${money(Math.abs(tradePnl))}.`;
         }
-        newDecisions.push({ id: `${symbol}-${barTime}`, symbol, action: newFills.at(-1)?.symbol === symbol ? newFills.at(-1).side.toUpperCase() : action.toUpperCase(), price, time: barTime, reason });
+        newDecisions.push({ id: `${symbol}-${candidate.candles.at(-1).date}`, symbol, action: newFills.at(-1)?.symbol === symbol ? newFills.at(-1).side.toUpperCase() : action, price, time: candidate.candles.at(-1).date, reason, pattern: pattern.name, bias: pattern.bias, source: suggestion ? 'Gemini' : 'Rules' });
       }
       if (newFills.length || newDecisions.length) {
         nextAccount.fills = [...newFills, ...nextAccount.fills].slice(0, 60);
@@ -165,6 +257,24 @@ export default function TradingDesk({ autoStart = true }) {
       window.clearInterval(timer);
     };
   }, [running, budget]);
+
+  function addStock(stock) {
+    const symbol = `${stock.symbol}:${stock.exchange}`;
+    if (watchlistRef.current.includes(symbol)) return;
+    if (watchlistRef.current.length >= 10) { setError('Keep up to 10 symbols in the minute-by-minute watchlist. Browse the full directory and swap symbols as needed.'); return; }
+    const next = [...watchlistRef.current, symbol];
+    watchlistRef.current = next;
+    setWatchlist(next);
+    setError('');
+  }
+
+  function removeStock(symbol) {
+    if (watchlistRef.current.length <= 1) { setError('Keep at least one stock in the practice watchlist.'); return; }
+    const next = watchlistRef.current.filter(item => item !== symbol);
+    watchlistRef.current = next;
+    setWatchlist(next);
+    setMarkets(current => { const updated = { ...current }; delete updated[symbol]; return updated; });
+  }
 
   function updateBudget(event) {
     event.preventDefault();
@@ -220,7 +330,7 @@ export default function TradingDesk({ autoStart = true }) {
   const freshness = lastChecked ? lastChecked.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' }) : 'Checking prices…';
 
   return <section className="trading-desk panel simple-trading" aria-labelledby="trading-desk-title">
-    <header className="simple-trading-head"><div><div className="simple-kicker"><span className="simple-dot"/> CHECKS EVERY MINUTE · AUTOMATED PRACTICE STRATEGY</div><h2 id="trading-desk-title">Your investing desk</h2><p>Choose how much to use and how much risk feels right. See every buy, sell, or wait decision in plain language.</p></div><span className="practice-badge"><Landmark size={14}/> Sample practice account</span></header>
+    <header className="simple-trading-head"><div><div className="simple-kicker"><span className="simple-dot"/> CANDLE SCAN · {watchlist.length} STOCKS · CHECKS EVERY MINUTE</div><h2 id="trading-desk-title">Your investing desk</h2><p>Gemini reviews each watched stock’s candles. Safety rules check every suggested order before a simulated trade.</p></div><span className="practice-badge"><Landmark size={14}/> Sample practice account</span></header>
 
     <div className="simple-money-cards"><article><span><Landmark size={15}/> Sample account balance</span><b>{money(account.bankCash + account.cash)}</b><small>Preloaded practice balance · not a linked bank</small></article><article><span><Wallet size={15}/> Investing cash</span><b>{money(account.cash)}</b><small>Available to the strategy</small></article><article><span><Activity size={15}/> Stock portfolio</span><b>{money(positionsValue)}</b><small>{holdings.length} stocks · latest available prices</small></article><article><span><TrendingUp size={15}/> Practice result</span><b className={totalPnl >= 0 ? 'desk-positive' : 'desk-negative'}>{totalPnl >= 0 ? '+' : '−'}{money(Math.abs(totalPnl))}</b><small>Changes as practice prices move</small></article></div>
 
@@ -232,7 +342,9 @@ export default function TradingDesk({ autoStart = true }) {
     {error && <div className="simple-error" role="alert">{error}</div>}
     {loading && <div className="simple-loading" role="status"><span/>Checking available price history…</div>}
 
-    <div className="simple-watch-grid" aria-label="Stocks watched by the strategy">{SYMBOLS.map(symbol => <article key={symbol}><span>{symbol}</span><b>{prices[symbol] ? money(prices[symbol]) : '—'}</b><small>{markets[symbol]?.source || 'Waiting for price'}</small></article>)}</div>
+    <div className="simple-analysis-heading"><div className="simple-section-title simple-analysis-title"><span className="simple-icon ai"><Sparkles size={17}/></span><span><b>Market scan · {aiStatus}</b><small>Each row shows what Gemini reviewed before it suggested an action.</small></span></div></div>
+    <div className="simple-watch-grid" aria-label="Candlestick analysis for every watched stock">{watchlist.map(symbol => { const analysis = analyses[symbol]; const quote = analysis?.quote; return <article className="simple-stock-card" key={symbol}><div className="simple-stock-card-head"><span><b>{tickerName(symbol)}</b><small>{exchangeName(symbol)} · {quote?.interval === '1day' || quote?.interval === '1d' ? 'daily candles' : 'minute candles'}</small></span><b className="simple-stock-price">{analysis?.price ? `${quote?.currency === 'CAD' ? 'CA$' : '$'}${new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(analysis.price)}` : '—'}</b><button type="button" className="simple-remove-stock" aria-label={`Remove ${tickerName(symbol)}`} onClick={() => removeStock(symbol)}><X size={14}/></button></div><MiniCandles points={quote?.points || []}/><div className="simple-pattern-row"><span className={`simple-pattern-badge ${analysis?.pattern.bias || 'neutral'}`}>{analysis?.pattern.name || 'Waiting for candles'}</span><span className={`simple-pattern-bias ${analysis?.pattern.bias || 'neutral'}`}>{analysis?.pattern.bias || 'neutral'}</span></div><p className="simple-pattern-explanation">{analysis?.pattern.explanation || 'Candlestick analysis will appear when price history loads.'}</p><div className="simple-stock-decision"><span className={`simple-action ${(analysis?.action || 'scan').toLowerCase()}`}>{analysis?.action || 'SCANNING'}</span><small>{quote?.source || 'Waiting for market data'}</small></div></article>; })}</div>
+    <section className="simple-universe" aria-labelledby="stock-directory-title"><div className="simple-section-title"><span className="simple-icon"><Search size={17}/></span><span><b id="stock-directory-title">Browse all NYSE & TSX listings</b><small>Search the full exchange directory, then add stocks to the scan watchlist. Up to 10 can be scanned each minute.</small></span></div><div className="simple-directory-controls"><div className="simple-exchange-tabs"><button type="button" className={directoryExchange === 'NYSE' ? 'active' : ''} onClick={() => { setDirectoryExchange('NYSE'); setDirectoryPage(1); }}>NYSE</button><button type="button" className={directoryExchange === 'TSX' ? 'active' : ''} onClick={() => { setDirectoryExchange('TSX'); setDirectoryPage(1); }}>TSX</button></div><label className="simple-directory-search"><Search size={15}/><input value={directoryQuery} onChange={event => { setDirectoryQuery(event.target.value); setDirectoryPage(1); }} placeholder="Search ticker or company" aria-label="Search stock listings"/></label></div>{directoryError && <p className="simple-directory-error" role="status">{directoryError}</p>}<div className="simple-directory-list">{directoryResults.map(stock => { const symbol = `${stock.symbol}:${stock.exchange}`; const added = watchlist.includes(symbol); return <div className="simple-directory-item" key={symbol}><span><b>{stock.symbol}</b><small>{stock.name}</small></span><small>{stock.currency} · {stock.exchange}</small><button type="button" onClick={() => added ? removeStock(symbol) : addStock(stock)} disabled={!added && watchlist.length >= 10}>{added ? <><X size={13}/> Remove</> : <><Plus size={13}/> Add</>}</button></div>; })}{!directoryResults.length && !directoryBusy && <div className="simple-empty">{directoryError ? 'Add your market-data key in Vercel to load the exchange directory.' : 'No matching listings found.'}</div>}{directoryBusy && <div className="simple-directory-loading">Loading {directoryExchange} listings…</div>}</div>{!directoryQuery.trim() && <button type="button" className="simple-directory-more" onClick={() => setDirectoryPage(page => page + 1)} disabled={directoryBusy || directoryResults.length >= 10000}>Load next 100 listings</button>}</section>
     <div className="simple-section-title simple-portfolio-title"><span className="simple-icon"><Wallet size={17}/></span><span><b>Your practice stocks</b><small>Each stock's value updates when new market prices are available.</small></span></div>
     {holdings.length ? <div className="simple-holdings"><div className="simple-holding-header"><span>STOCK</span><span>SHARES</span><span>PRICE</span><span>VALUE</span><span>RESULT</span></div>{holdings.map(holding => <div className="simple-holding" key={holding.symbol}><b>{holding.symbol}</b><span>{holding.shares.toFixed(4)}</span><span>{money(holding.price)}</span><b>{money(holding.marketValue)}</b><strong className={holding.pnl >= 0 ? 'desk-positive' : 'desk-negative'}>{holding.pnl >= 0 ? '+' : '−'}{money(Math.abs(holding.pnl))}</strong></div>)}</div> : <div className="simple-empty">No practice stocks yet. The strategy will add a position only when its buy rule is met.</div>}
 

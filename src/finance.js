@@ -148,6 +148,30 @@ export function getVolatilityProfile(value) {
   };
 }
 
+export function analyzeCandlestickPattern(candles = []) {
+  const valid = candles.filter(candle => ['open', 'high', 'low', 'close'].every(key => Number.isFinite(Number(candle[key]))));
+  if (!valid.length) return { name: 'Waiting for candles', bias: 'neutral', explanation: 'Candlestick data is not available yet.' };
+  const current = valid.at(-1);
+  const previous = valid.at(-2);
+  const range = Math.max(0, current.high - current.low);
+  const body = Math.abs(current.close - current.open);
+  const upperWick = current.high - Math.max(current.open, current.close);
+  const lowerWick = Math.min(current.open, current.close) - current.low;
+  if (range <= 0) return { name: 'Flat candle', bias: 'neutral', explanation: 'Open, high, low, and close were nearly identical.' };
+  if (previous && previous.close < previous.open && current.close > current.open && current.open <= previous.close && current.close >= previous.open) {
+    return { name: 'Bullish engulfing', bias: 'bullish', explanation: 'This up candle covers the prior down candle’s body; it can signal a short-term shift upward.' };
+  }
+  if (previous && previous.close > previous.open && current.close < current.open && current.open >= previous.close && current.close <= previous.open) {
+    return { name: 'Bearish engulfing', bias: 'bearish', explanation: 'This down candle covers the prior up candle’s body; it can signal a short-term shift downward.' };
+  }
+  if (body / range <= 0.1) return { name: 'Doji', bias: 'neutral', explanation: 'Open and close are close together, showing indecision for this period.' };
+  if (lowerWick >= body * 2 && upperWick <= body) return { name: 'Hammer-like', bias: 'bullish', explanation: 'A long lower wick and small body show buyers lifted price from the low; context matters.' };
+  if (upperWick >= body * 2 && lowerWick <= body) return { name: 'Shooting-star-like', bias: 'bearish', explanation: 'A long upper wick and small body show price fell back from the high; context matters.' };
+  return current.close > current.open
+    ? { name: 'Up candle', bias: 'bullish', explanation: 'The close finished above the open for this period.' }
+    : { name: 'Down candle', bias: 'bearish', explanation: 'The close finished below the open for this period.' };
+}
+
 export function evaluateMovingAverageCrossover(prices, index, hasPosition, fastWindow = 3, slowWindow = 5) {
   if (!Array.isArray(prices) || !Number.isInteger(index) || index < slowWindow || fastWindow < 1 || slowWindow <= fastWindow) return 'hold';
   const valid = prices.slice(0, index + 1).map(Number);

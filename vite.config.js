@@ -2,14 +2,16 @@ import { defineConfig, loadEnv } from 'vite';
 import copilotHandler from './api/copilot.js';
 import marketHandler from './api/market.js';
 import plaidHandler from './api/plaid.js';
+import stocksHandler from './api/stocks.js';
+import tradingAiHandler from './api/trading-ai.js';
 
 function localApiRoutes() {
-  const handlers = { copilot: copilotHandler, market: marketHandler, plaid: plaidHandler };
+  const handlers = { copilot: copilotHandler, market: marketHandler, plaid: plaidHandler, stocks: stocksHandler, 'trading-ai': tradingAiHandler };
   return {
     name: 'velora-local-api-routes',
     configResolved(config) {
       const localSecrets = loadEnv(config.mode, config.root, '');
-      for (const name of ['GEMINI_API_KEY', 'PLAID_CLIENT_ID', 'PLAID_SECRET']) {
+      for (const name of ['GEMINI_API_KEY', 'GEMINI_MODEL', 'TWELVE_DATA_API_KEY', 'PLAID_CLIENT_ID', 'PLAID_SECRET']) {
         if (localSecrets[name]) process.env[name] = localSecrets[name];
       }
     },
