@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Activity, CircleHelp, Landmark, Pause, Play, Plus, RotateCcw, Search, ShieldCheck, Sparkles, TrendingUp, Wallet, X } from 'lucide-react';
 import { analyzeCandlestickPattern, evaluateMovingAverageCrossover, getVolatilityProfile } from './finance';
-import { createInitialPaperAccount, readPaperAccount, savePaperAccount } from './paperAccount';
+import { accrueSampleEarnings, createInitialPaperAccount, readPaperAccount, savePaperAccount } from './paperAccount';
 import './trading-desk.css';
 import './trading-risk.css';
 import './simple-trading.css';
@@ -150,6 +150,7 @@ export default function TradingDesk({ autoStart = true, onAiStatus = () => {} })
       const nextAccount = { ...accountRef.current, positions: { ...accountRef.current.positions } };
       const newFills = [];
       const newDecisions = [];
+      const newApprovals = [];
       const activeRisk = getVolatilityProfile(volatilityRef.current);
       const candidates = [];
       for (const symbol of symbols) {
@@ -200,10 +201,11 @@ export default function TradingDesk({ autoStart = true, onAiStatus = () => {} })
         const suggestedAction = suggestion?.action || fallback;
         let action = stopTriggered ? 'SELL' : suggestedAction;
         let reason = stopTriggered
-          ? `Safety exit: price reached the ${(activeRisk.stopLossPct * 100).toFixed(1)}% limit.`
-          : suggestion?.reason || `${pattern.name}: ${pattern.explanation} Moving-average check: ${signal}.`;
-        if (action === 'BUY' && (pattern.bias !== 'bullish' || signal !== 'buy')) { action = 'HOLD'; reason = `Rules blocked the buy: ${pattern.bias !== 'bullish' ? `${pattern.name} is not bullish` : 'the moving-average check is not a buy'}. ${reason}`; }
-        if (action === 'SELL' && position.shares <= 0) { action = 'HOLD'; reason = 'Risk check blocked the sell: there is no practice holding to sell.'; }
+          ? `The price reached your ${ (activeRisk.stopLossPct * 100).toFixed(1)}% safety limit.`
+          : suggestion?.reason || `${pattern.name}: ${pattern.explanation} Trend check: ${signal}.`;
+        let ruleVerdict = 'WAIT';
+        if (action === 'BUY' && (pattern.bias !== 'bullish' || signal !== 'buy')) { action = 'HOLD'; reason = `Safety check says wait: ${pattern.bias !== 'bullish' ? `${pattern.name} does not show an upward pattern` : 'the trend does not support a buy'}. ${reason}`; ruleVerdict = 'BLOCKED'; }
+        if (action === 'SELL' && position.shares <= 0) { action = 'HOLD'; reason = 'Safety check says wait: there are no shares in this practice account to sell.'; ruleVerdict = 'BLOCKED'; }
         if (action === 'BUY' && nextAccount.cash > 1) {
           const currentValue = position.shares * price;
           const currentPortfolioValue = nextAccount.cash + Object.entries(nextAccount.positions).reduce((sum, [ticker, held]) => sum + (Number(nextMarkets[ticker]?.points?.at(-1)?.close) || held.mark || held.entryPrice) * held.shares, 0);
@@ -211,39 +213,30 @@ export default function TradingDesk({ autoStart = true, onAiStatus = () => {} })
           const spend = Math.min(nextAccount.cash, Math.max(0, limit - currentValue));
           const shares = Number((spend / price).toFixed(6));
           if (shares > 0) {
-            const cost = shares * price;
-            nextAccount.positions[symbol] = {
-              shares: Number((position.shares + shares).toFixed(6)),
-              entryPrice: position.shares ? (position.shares * position.entryPrice + cost) / (position.shares + shares) : price,
-              mark: price,
-            };
-            nextAccount.cash = cents(nextAccount.cash - cost);
-            const fill = { id: `${symbol}-${barTime}-buy`, symbol, side: 'buy', shares, price, time: barTime, reason };
-            newFills.push(fill);
-            reason += ` Practice order: ${shares.toFixed(4)} shares for ${money(cost)}.`;
+            newApprovals.push({ id: `${symbol}-${barTime}-buy`, symbol, side: 'BUY', price, shares, amount: cents(shares * price), time: barTime, reason, source: suggestion ? 'AI' : 'Strategy' });
+            reason += ` Suggested size: ${shares.toFixed(4)} shares (${money(shares * price)}). Waiting for your approval.`;
+            ruleVerdict = 'READY';
           } else {
-            reason = 'Wait: this stock is already at its selected portfolio limit.';
+            reason = 'Safety check says wait: this stock is already at its limit.';
             action = 'HOLD';
+            ruleVerdict = 'BLOCKED';
           }
         } else if (action === 'BUY') {
-          reason = 'Wait: there is no investing cash available for this practice order.';
+          reason = 'Safety check says wait: there is no investing cash available.';
           action = 'HOLD';
+          ruleVerdict = 'BLOCKED';
         } else if (action === 'SELL' && position.shares > 0) {
-          const proceeds = position.shares * price;
-          const tradePnl = (price - position.entryPrice) * position.shares;
-          nextAccount.cash = cents(nextAccount.cash + proceeds);
-          nextAccount.realizedPnl = cents(nextAccount.realizedPnl + tradePnl);
-          delete nextAccount.positions[symbol];
-          newFills.push({ id: `${symbol}-${barTime}-sell`, symbol, side: 'sell', shares: position.shares, price, time: barTime, reason, pnl: tradePnl });
-          reason += ` Practice sale: ${money(proceeds)}; result ${tradePnl >= 0 ? '+' : '−'}${money(Math.abs(tradePnl))}.`;
+          newApprovals.push({ id: `${symbol}-${barTime}-sell`, symbol, side: 'SELL', price, shares: position.shares, amount: cents(position.shares * price), time: barTime, reason, source: suggestion ? 'AI' : 'Strategy' });
+          reason += ` Suggested sale: ${position.shares.toFixed(4)} shares (${money(position.shares * price)}). Waiting for your approval.`;
+          ruleVerdict = 'READY';
         }
-        const finalAction = newFills.at(-1)?.symbol === symbol ? newFills.at(-1).side.toUpperCase() : action;
-        const ruleVerdict = suggestedAction !== finalAction ? 'BLOCKED' : finalAction === 'HOLD' ? 'WAIT' : 'PASS';
-        newDecisions.push({ id: `${symbol}-${candidate.candles.at(-1).date}`, symbol, action: finalAction, suggestedAction, ruleVerdict, price, time: candidate.candles.at(-1).date, reason, pattern: pattern.name, bias: pattern.bias, source: suggestion ? 'AI' : 'Rules' });
+        const finalAction = newApprovals.at(-1)?.symbol === symbol ? 'PENDING' : action;
+        newDecisions.push({ id: `${symbol}-${candidate.candles.at(-1).date}`, symbol, action: finalAction, suggestedAction, ruleVerdict, price, time: candidate.candles.at(-1).date, reason, pattern: pattern.name, bias: pattern.bias, source: suggestion ? 'AI' : 'Strategy' });
       }
-      if (newFills.length || newDecisions.length) {
+      if (newFills.length || newDecisions.length || newApprovals.length) {
         nextAccount.fills = [...newFills, ...nextAccount.fills].slice(0, 60);
         nextAccount.decisions = [...newDecisions, ...(nextAccount.decisions || [])].slice(0, 80);
+        nextAccount.pendingApprovals = [...newApprovals, ...(nextAccount.pendingApprovals || [])].slice(0, 10);
         accountRef.current = nextAccount;
         setAccount(nextAccount);
       }
@@ -271,6 +264,54 @@ export default function TradingDesk({ autoStart = true, onAiStatus = () => {} })
       window.clearInterval(timer);
     };
   }, [running, budget]);
+
+  function finishApproval(requestId, approve) {
+    const current = accountRef.current;
+    const request = (current.pendingApprovals || []).find(item => item.id === requestId);
+    if (!request) return;
+    const pendingApprovals = current.pendingApprovals.filter(item => item.id !== requestId);
+    if (!approve) {
+      const next = { ...current, pendingApprovals, decisions: current.decisions.map(item => item.id === request.id.replace(/-(buy|sell)$/, '') ? { ...item, action: 'SKIPPED', ruleVerdict: 'SKIPPED', reason: 'You chose to skip this idea. No practice order was placed.' } : item) };
+      accountRef.current = next; setAccount(next); return;
+    }
+    const quote = markets[request.symbol];
+    const price = Number(quote?.points?.at(-1)?.close) || request.price;
+    const position = current.positions[request.symbol] || { shares: 0, entryPrice: 0 };
+    const activeRisk = getVolatilityProfile(volatilityRef.current);
+    let next = { ...current, pendingApprovals, positions: { ...current.positions } };
+    if (request.side === 'BUY') {
+      const points = quote?.points || [];
+      const pattern = analyzeCandlestickPattern(points);
+      const trend = evaluateMovingAverageCrossover(points.map(point => point.close), Math.max(0, points.length - 1), position.shares > 0, activeRisk.fastWindow, activeRisk.slowWindow);
+      const currentValue = position.shares * price;
+      const portfolioValue = current.cash + Object.values(current.positions).reduce((sum, held) => sum + (Number(quote?.points?.at(-1)?.close) || held.mark || held.entryPrice) * held.shares, 0);
+      const limit = Math.min(budgetRef.current, portfolioValue || budgetRef.current) * activeRisk.maxPositionPct;
+      const spend = Math.min(next.cash, Math.max(0, limit - currentValue));
+      const shares = Number((spend / price).toFixed(6));
+      if (pattern.bias !== 'bullish' || trend !== 'buy' || shares <= 0) {
+        setError(`This buy no longer passes the safety check for ${tickerName(request.symbol)}. No order was placed.`);
+        next.decisions = next.decisions.map(item => item.id === request.id.replace(/-(buy|sell)$/, '') ? { ...item, action: 'BLOCKED', ruleVerdict: 'BLOCKED', reason: 'The latest price pattern or account limit changed before approval.' } : item);
+      } else {
+        const cost = cents(shares * price);
+        next.cash = cents(next.cash - cost);
+        next.positions[request.symbol] = { shares: Number((position.shares + shares).toFixed(6)), entryPrice: position.shares ? (position.shares * position.entryPrice + cost) / (position.shares + shares) : price, mark: price };
+        const fill = { id: `${request.id}-approved`, symbol: request.symbol, side: 'buy', shares, price, time: new Date().toISOString(), reason: request.reason };
+        next.fills = [fill, ...next.fills].slice(0, 60);
+        next.decisions = next.decisions.map(item => item.id === request.id.replace(/-(buy|sell)$/, '') ? { ...item, action: 'BOUGHT', ruleVerdict: 'APPROVED', reason: `You approved ${shares.toFixed(4)} shares for ${money(cost)}.` } : item);
+        setError('');
+      }
+    } else if (position.shares <= 0) {
+      setError('Those shares are no longer in the account, so no sale was placed.');
+    } else {
+      const proceeds = cents(position.shares * price);
+      const tradePnl = cents((price - position.entryPrice) * position.shares);
+      next.cash = cents(next.cash + proceeds); next.realizedPnl = cents(next.realizedPnl + tradePnl); delete next.positions[request.symbol];
+      next.fills = [{ id: `${request.id}-approved`, symbol: request.symbol, side: 'sell', shares: position.shares, price, time: new Date().toISOString(), reason: request.reason, pnl: tradePnl }, ...next.fills].slice(0, 60);
+      next.decisions = next.decisions.map(item => item.id === request.id.replace(/-(buy|sell)$/, '') ? { ...item, action: 'SOLD', ruleVerdict: 'APPROVED', reason: `You approved selling ${position.shares.toFixed(4)} shares for ${money(proceeds)}.` } : item);
+      setError('');
+    }
+    accountRef.current = next; setAccount(next);
+  }
 
   function addStock(stock) {
     const symbol = `${stock.symbol}:${stock.exchange}`;
@@ -344,28 +385,30 @@ export default function TradingDesk({ autoStart = true, onAiStatus = () => {} })
   const freshness = lastChecked ? lastChecked.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' }) : 'Checking prices…';
 
   return <section className="trading-desk panel simple-trading" aria-labelledby="trading-desk-title">
-    <header className="simple-trading-head"><div><div className="simple-kicker"><span className="simple-dot"/> AI STOCK TRADING · AUTOMATIC SCANS ON</div><h2 id="trading-desk-title">A clearer way to practice investing</h2><p>Scans each minute. AI suggests an action from new candles; independent safety rules make the final call.</p></div><span className="practice-badge"><Landmark size={14}/> Demo bank · CA$25,000</span></header>
+    <header className="simple-trading-head"><div><div className="simple-kicker"><span className="simple-dot"/> AI INVESTING ASSISTANT</div><h2 id="trading-desk-title">Your money, with a second set of eyes.</h2><p>Prices refresh every minute. AI explains ideas, safety checks review them, and you approve every practice order.</p></div><span className="practice-badge"><Landmark size={14}/> Demo bank · sample income $500/day</span></header>
 
-    <div className="simple-money-cards"><article><span><Landmark size={15}/> Demo account total</span><b>{money(account.bankCash + account.cash + positionsValue)}</b><small>Checking + investing cash + current holdings</small></article><article><span><Wallet size={15}/> Investing cash</span><b>{money(account.cash)}</b><small>Available to the strategy</small></article><article><span><Activity size={15}/> Stock portfolio</span><b>{money(positionsValue)}</b><small>{holdings.length} stocks · latest available prices</small></article><article><span><TrendingUp size={15}/> Practice result</span><b className={totalPnl >= 0 ? 'desk-positive' : 'desk-negative'}>{totalPnl >= 0 ? '+' : '−'}{money(Math.abs(totalPnl))}</b><small>Changes as practice prices move</small></article></div>
+    <div className="simple-money-cards"><article><span><Landmark size={15}/> Demo account total</span><b>{money(account.bankCash + account.cash + positionsValue)}</b><small>Demo bank + investing cash + stocks</small></article><article><span><Wallet size={15}/> Cash ready to invest</span><b>{money(account.cash)}</b><small>Used only after you approve an idea</small></article><article><span><Activity size={15}/> Stock value</span><b>{money(positionsValue)}</b><small>{holdings.length} stocks · latest available prices</small></article><article><span><TrendingUp size={15}/> Practice result</span><b className={totalPnl >= 0 ? 'desk-positive' : 'desk-negative'}>{totalPnl >= 0 ? '+' : '−'}{money(Math.abs(totalPnl))}</b><small>Changes as practice prices move</small></article></div>
 
     <div className="simple-setup-grid"><form className="simple-budget" onSubmit={updateBudget}><div className="simple-section-title"><span className="simple-icon"><Wallet size={17}/></span><span><b>How much should the strategy use?</b><small>Move practice money from checking to investing cash.</small></span></div><label htmlFor="practice-budget">Investing budget <strong>{money(budget)}</strong></label><input id="practice-budget" type="range" min="500" max={START_BANK} step="500" value={budget} onChange={event => setBudget(Number(event.target.value))}/><div className="simple-range-labels"><span>$500</span><span>{money(START_BANK)}</span></div><button type="submit" className="simple-primary">Set investing budget</button></form>
-      <div className="simple-risk"><div className="simple-section-title"><span className="simple-icon risk"><Activity size={17}/></span><span><b>How much price movement feels okay?</b><small>This changes practice trade size and the exit threshold.</small></span><strong>{risk.label}</strong></div><input type="range" min="0" max="100" step="1" value={volatility} onChange={event => setVolatility(Number(event.target.value))} aria-label="Risk level"/><div className="simple-range-labels"><span>Lower risk</span><span>Higher risk</span></div><div className="simple-risk-explain"><ShieldCheck size={14}/> Up to {(risk.maxPositionPct * 100).toFixed(0)}% per stock · practice exit threshold {(risk.stopLossPct * 100).toFixed(1)}%</div></div></div>
+      <div className="simple-risk"><div className="simple-section-title"><span className="simple-icon risk"><Activity size={17}/></span><span><b>How much price movement feels okay?</b><small>A calmer setting means smaller stock amounts and a closer sell limit.</small></span><strong>{risk.label}</strong></div><input type="range" min="0" max="100" step="1" value={volatility} onChange={event => setVolatility(Number(event.target.value))} aria-label="Risk level"/><div className="simple-range-labels"><span>Lower risk</span><span>Higher risk</span></div><div className="simple-risk-explain"><ShieldCheck size={14}/> At most {(risk.maxPositionPct * 100).toFixed(0)}% of your account in one stock · review a drop of {(risk.stopLossPct * 100).toFixed(1)}%</div></div></div>
 
-    <div className="simple-controls"><div><span className={running ? 'simple-dot' : 'simple-dot paused'}/><b>{running ? 'Automatic practice trading on' : 'Automatic practice trading paused'}</b><small>{loading ? 'Checking prices…' : `Last check: ${freshness}`}</small></div><button type="button" onClick={() => setRunning(value => !value)}>{running ? <><Pause size={15}/> Pause</> : <><Play size={15}/> Start automatic trading</>}</button><button type="button" className="simple-reset" onClick={resetPractice}><RotateCcw size={14}/> Reset practice account</button></div>
+    <div className="simple-controls"><div><span className={running ? 'simple-dot' : 'simple-dot paused'}/><b>{running ? 'AI checking each minute · orders wait for you' : 'AI checks paused'}</b><small>{loading ? 'Checking prices…' : `Last check: ${freshness}`}</small></div><button type="button" onClick={() => setRunning(value => !value)}>{running ? <><Pause size={15}/> Pause</> : <><Play size={15}/> Start AI checks</>}</button><button type="button" className="simple-reset" onClick={resetPractice}><RotateCcw size={14}/> Reset practice account</button></div>
 
-    <div className="simple-how-it-works" aria-label="How the automated scan works"><article><span>01</span><div><b>Read the candles</b><small>Checks your {watchlist.length} selected stocks once a minute. TSX gets daily candles.</small></div></article><article><span>02</span><div><b>AI explains the pattern</b><small>Reviews candle shape and trend, then suggests buy, sell, or wait.</small></div></article><article><span>03</span><div><b>Rules check the order</b><small>Cash, position limits, candle bias, and exit rules are checked independently.</small></div></article></div>
+    <div className="simple-how-it-works" aria-label="How the automated scan works"><article><span>01</span><div><b>Check price patterns</b><small>Checks {watchlist.length} selected stocks every minute. Canadian prices update daily.</small></div></article><article><span>02</span><div><b>AI explains its idea</b><small>Reviews candle shape and trend, then suggests buy, sell, or wait.</small></div></article><article><span>03</span><div><b>Safety checks</b><small>It checks your cash, stock amount, price pattern, and sell limit.</small></div></article></div>
 
     {error && <div className="simple-error" role="alert">{error}</div>}
     {loading && <div className="simple-loading" role="status"><span/>Checking available price history…</div>}
 
-    <div className="simple-analysis-heading"><div className="simple-section-title simple-analysis-title"><span className="simple-icon ai"><Sparkles size={17}/></span><span><b>Market scan · {aiStatus}</b><small>AI suggests an action; separate rules make the final call. Scanning {watchlist.length} of your selected stocks.</small></span></div></div>
-    <div className="simple-watch-grid" aria-label="Candlestick analysis for every watched stock">{watchlist.map(symbol => { const analysis = analyses[symbol]; const quote = analysis?.quote; return <article className="simple-stock-card" key={symbol}><div className="simple-stock-card-head"><span><b>{tickerName(symbol)}</b><small>{exchangeName(symbol)} · {quote?.interval === '1day' || quote?.interval === '1d' ? 'daily candles' : 'minute candles'}</small></span><b className="simple-stock-price">{analysis?.price ? `${quote?.currency === 'CAD' ? 'CA$' : '$'}${new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(analysis.price)}` : '—'}</b><button type="button" className="simple-remove-stock" aria-label={`Remove ${tickerName(symbol)}`} onClick={() => removeStock(symbol)}><X size={14}/></button></div><MiniCandles points={quote?.points || []}/><div className="simple-pattern-row"><span className={`simple-pattern-badge ${analysis?.pattern.bias || 'neutral'}`}>{analysis?.pattern.name || 'Waiting for candles'}</span><span className={`simple-pattern-bias ${analysis?.pattern.bias || 'neutral'}`}>{analysis?.pattern.bias || 'neutral'}</span></div><p className="simple-pattern-explanation">{analysis?.pattern.explanation || 'Candlestick analysis will appear when price history loads.'}</p><div className="simple-stock-decision"><span className={`simple-action ${(analysis?.action || 'scan').toLowerCase()}`}>{analysis?.action || 'SCANNING'}</span><small>{quote?.source || 'Waiting for market data'}</small></div></article>; })}</div>
+    {(account.pendingApprovals || []).length > 0 && <section className="simple-approval-panel" aria-label="Trade ideas waiting for approval"><div><span className="simple-icon ai"><Sparkles size={17}/></span><span><b>AI has an idea for you</b><small>Review the reason and price. Nothing changes until you approve.</small></span></div>{account.pendingApprovals.map(request => <article key={request.id}><div className="approval-title"><strong>{request.side === 'BUY' ? 'Buy' : 'Sell'} {tickerName(request.symbol)}</strong><span>{request.shares.toFixed(4)} shares · about {money(request.amount)}</span></div><p>{request.reason}</p><small>Suggested price: {money(request.price)} · {request.source === 'AI' ? 'AI idea' : 'Strategy idea'} · Safety checks passed</small><div className="approval-actions"><button type="button" onClick={() => finishApproval(request.id, true)}>Approve practice order</button><button type="button" onClick={() => finishApproval(request.id, false)}>Skip</button></div></article>)}</section>}
+
+    <div className="simple-analysis-heading"><div className="simple-section-title simple-analysis-title"><span className="simple-icon ai"><Sparkles size={17}/></span><span><b>What AI is looking at · {aiStatus}</b><small>AI reviews price patterns and suggests buy, sell, or wait. Safety checks review each idea before you decide.</small></span></div></div>
+    <div className="simple-watch-grid" aria-label="Candlestick analysis for every watched stock">{watchlist.map(symbol => { const analysis = analyses[symbol]; const quote = analysis?.quote; return <article className="simple-stock-card" key={symbol}><div className="simple-stock-card-head"><span><b>{tickerName(symbol)}</b><small>{exchangeName(symbol)} · {quote?.interval === '1day' || quote?.interval === '1d' ? 'daily candles' : 'minute candles'}</small></span><b className="simple-stock-price">{analysis?.price ? `${quote?.currency === 'CAD' ? 'CA$' : '$'}${new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(analysis.price)}` : '—'}</b><button type="button" className="simple-remove-stock" aria-label={`Remove ${tickerName(symbol)}`} onClick={() => removeStock(symbol)}><X size={14}/></button></div><MiniCandles points={quote?.points || []}/><div className="simple-pattern-row"><span className={`simple-pattern-badge ${analysis?.pattern.bias || 'neutral'}`}>{analysis?.pattern.name || 'Waiting for candles'}</span><span className={`simple-pattern-bias ${analysis?.pattern.bias || 'neutral'}`}>{analysis?.pattern.bias || 'neutral'}</span></div><p className="simple-pattern-explanation">{analysis?.pattern.explanation || 'A simple price-pattern note will appear when prices load.'}</p><div className="simple-stock-decision"><span className={`simple-action ${(analysis?.action || 'scan').toLowerCase()}`}>{analysis?.action || 'SCANNING'}</span><small>{quote?.source || 'Waiting for market data'}</small></div></article>; })}</div>
     <details className="simple-universe" aria-labelledby="stock-directory-title"><summary className="simple-section-title"><span className="simple-icon"><Search size={17}/></span><span><b id="stock-directory-title">Add or remove stocks</b><small>Optional · search the NYSE and TSX directories.</small></span><span className="simple-details-label">Browse listings</span></summary><div className="simple-directory-controls"><div className="simple-exchange-tabs"><button type="button" className={directoryExchange === 'NYSE' ? 'active' : ''} onClick={() => { setDirectoryExchange('NYSE'); setDirectoryPage(1); }}>NYSE</button><button type="button" className={directoryExchange === 'TSX' ? 'active' : ''} onClick={() => { setDirectoryExchange('TSX'); setDirectoryPage(1); }}>TSX</button></div><label className="simple-directory-search"><Search size={15}/><input value={directoryQuery} onChange={event => { setDirectoryQuery(event.target.value); setDirectoryPage(1); }} placeholder="Search ticker or company" aria-label="Search stock listings"/></label></div>{directoryError && <p className="simple-directory-error" role="status">{directoryError}</p>}<div className="simple-directory-list">{directoryResults.map(stock => { const symbol = `${stock.symbol}:${stock.exchange}`; const added = watchlist.includes(symbol); return <div className="simple-directory-item" key={symbol}><span><b>{stock.symbol}</b><small>{stock.name}</small></span><small>{stock.currency} · {stock.exchange}</small><button type="button" onClick={() => added ? removeStock(symbol) : addStock(stock)} disabled={!added && watchlist.length >= 10}>{added ? <><X size={13}/> Remove</> : <><Plus size={13}/> Add</>}</button></div>; })}{!directoryResults.length && !directoryBusy && <div className="simple-empty">{directoryError ? 'Add your market-data key in Vercel to load the exchange directory.' : 'No matching listings found.'}</div>}{directoryBusy && <div className="simple-directory-loading">Loading {directoryExchange} listings…</div>}</div>{!directoryQuery.trim() && <button type="button" className="simple-directory-more" onClick={() => setDirectoryPage(page => page + 1)} disabled={directoryBusy || directoryResults.length >= 10000}>Load next 100 listings</button>}</details>
     <div className="simple-section-title simple-portfolio-title"><span className="simple-icon"><Wallet size={17}/></span><span><b>Your practice stocks</b><small>Each stock's value updates when new market prices are available.</small></span></div>
-    {holdings.length ? <div className="simple-holdings"><div className="simple-holding-header"><span>STOCK</span><span>SHARES</span><span>PRICE</span><span>VALUE</span><span>RESULT</span></div>{holdings.map(holding => <div className="simple-holding" key={holding.symbol}><b>{holding.symbol}</b><span>{holding.shares.toFixed(4)}</span><span>{money(holding.price)}</span><b>{money(holding.marketValue)}</b><strong className={holding.pnl >= 0 ? 'desk-positive' : 'desk-negative'}>{holding.pnl >= 0 ? '+' : '−'}{money(Math.abs(holding.pnl))}</strong></div>)}</div> : <div className="simple-empty">No practice stocks yet. The strategy will add a position only when its buy rule is met.</div>}
+    {holdings.length ? <div className="simple-holdings"><div className="simple-holding-header"><span>STOCK</span><span>SHARES</span><span>PRICE</span><span>VALUE</span><span>RESULT</span></div>{holdings.map(holding => <div className="simple-holding" key={holding.symbol}><b>{holding.symbol}</b><span>{holding.shares.toFixed(4)}</span><span>{money(holding.price)}</span><b>{money(holding.marketValue)}</b><strong className={holding.pnl >= 0 ? 'desk-positive' : 'desk-negative'}>{holding.pnl >= 0 ? '+' : '−'}{money(Math.abs(holding.pnl))}</strong></div>)}</div> : <div className="simple-empty">No stocks yet. The assistant will ask before suggesting a practice buy.</div>}
 
-    <div className="simple-analysis-heading"><div className="simple-section-title simple-analysis-title"><span className="simple-icon ai"><Sparkles size={17}/></span><span><b>Decision log</b><small>See the AI suggestion, any rule checks, and why the final action was taken.</small></span></div><button type="button" onClick={explainLatestDecision} disabled={!account.decisions?.length || aiBusy}>{aiBusy ? 'Asking AI…' : 'Explain latest'}</button></div>
-    {account.decisions?.length ? <div className="simple-decisions">{account.decisions.slice(0, 5).map(item => <article key={item.id}><span className={`simple-action ${item.action.toLowerCase()}`}>{item.action}</span><div><b>{item.symbol} · {money(item.price)}</b><small><strong>{item.source === 'AI' ? 'AI suggestion' : 'Strategy check'}: {item.suggestedAction || item.action} · Rules: {item.ruleVerdict || (item.action === 'HOLD' ? 'WAIT' : 'PASS')} · Final: {item.action}.</strong> {item.reason}</small></div><time>{item.time ? new Date(item.time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'Initial setup'}</time></article>)}</div> : <div className="simple-empty">Waiting for a new price update. The strategy will show whether it buys, sells, or waits and why.</div>}
+    <div className="simple-analysis-heading"><div className="simple-section-title simple-analysis-title"><span className="simple-icon ai"><Sparkles size={17}/></span><span><b>Why the AI suggested it</b><small>See the idea, safety check, and what you chose.</small></span></div><button type="button" onClick={explainLatestDecision} disabled={!account.decisions?.length || aiBusy}>{aiBusy ? 'Asking AI…' : 'Explain latest'}</button></div>
+    {account.decisions?.length ? <div className="simple-decisions">{account.decisions.slice(0, 5).map(item => <article key={item.id}><span className={`simple-action ${item.action.toLowerCase()}`}>{item.action}</span><div><b>{item.symbol} · {money(item.price)}</b><small><strong>{item.source === 'AI' ? 'AI suggestion' : 'Strategy check'}: {item.suggestedAction || item.action} · Rules: {item.ruleVerdict || (item.action === 'HOLD' ? 'WAIT' : 'PASS')} · Final: {item.action}.</strong> {item.reason}</small></div><time>{item.time ? new Date(item.time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'Initial setup'}</time></article>)}</div> : <div className="simple-empty">Waiting for a price update. The assistant will explain whether it suggests buying, selling, or waiting.</div>}
     {aiExplanation && <div className="simple-ai-explanation"><Sparkles size={15}/><p>{aiExplanation}</p></div>}
 
     {account.fills.length > 0 && <div className="simple-fill-summary"><b>Recent practice orders</b>{account.fills.slice(0, 3).map(fill => <span key={fill.id}><i className={fill.side}/>{fill.side.toUpperCase()} {fill.symbol} · {fill.shares.toFixed(4)} shares at {money(fill.price)}</span>)}</div>}
