@@ -13,6 +13,15 @@ import './onboarding.css';
 import './workspace.css';
 
 const personas = ['Kid', 'Teen', 'Adult'];
+const themeOptions = [
+  { id: 'blue-light', name: 'Blue & white', palette: 'blue', mode: 'light', swatches: ['#3975d5', '#f7faff', '#ffffff'] },
+  { id: 'blue-dark', name: 'Blue & charcoal', palette: 'blue', mode: 'dark', swatches: ['#75a5ff', '#182435', '#26364b'] },
+  { id: 'green-light', name: 'Green & white', palette: 'green', mode: 'light', swatches: ['#347954', '#f4f8f4', '#ffffff'] },
+  { id: 'green-dark', name: 'Green & charcoal', palette: 'green', mode: 'dark', swatches: ['#8ad0a1', '#19251e', '#29382f'] },
+  { id: 'gold-beige', name: 'Gold & beige', palette: 'gold', mode: 'light', swatches: ['#a77b2d', '#f7f0df', '#fffaf0'] },
+  { id: 'gold-dark', name: 'Gold & charcoal', palette: 'gold', mode: 'dark', swatches: ['#e3bd6a', '#25221a', '#393323'] },
+  { id: 'slate-dark', name: 'Slate grey', palette: 'slate', mode: 'dark', swatches: ['#b0bdc9', '#20252c', '#303740'] },
+];
 const subscriptions = [];
 const money = (value, digits = 0) => `$${new Intl.NumberFormat('en-CA', { maximumFractionDigits: digits, minimumFractionDigits: digits }).format(value)}`;
 
@@ -23,7 +32,30 @@ function readAccountProfile() {
   } catch { return null; }
 }
 
-function AccountSetup({ onCreate }) {
+function readActiveAccountProfile() {
+  try {
+    if (window.localStorage.getItem('velora-session-ended') === 'true') return null;
+  } catch { /* A browser without storage keeps the profile in this session. */ }
+  return readAccountProfile();
+}
+
+function readPalette() {
+  try {
+    const saved = window.localStorage.getItem('velora-palette');
+    if (themeOptions.some(option => option.id === saved)) return saved;
+    return window.localStorage.getItem('velora-theme') === 'dark' ? 'green-dark' : 'green-light';
+  } catch { return 'green-light'; }
+}
+
+function ThemePicker({ value, onChange }) {
+  return <div className="theme-choice-grid" role="radiogroup" aria-label="Choose a colour theme">{themeOptions.map(option => <button type="button" role="radio" aria-checked={value === option.id} key={option.id} className={`theme-choice ${value === option.id ? 'selected' : ''}`} onClick={() => onChange(option.id)}><span className="theme-swatches">{option.swatches.map((color, index) => <i key={index} style={{ background: color }}/>)}</span><span><b>{option.name}</b><small>{option.mode === 'dark' ? 'Dark mode' : 'Light mode'}</small></span><span className="theme-radio">{value === option.id && <i/>}</span></button>)}</div>;
+}
+
+function LocalLogin({ profile, palette, onPaletteChange, onLogin }) {
+  return <div className="account-setup-backdrop"><section className="account-setup login-setup" role="dialog" aria-modal="true" aria-labelledby="login-title"><div className="setup-brand"><span className="brand-mark"><span/><span/><span/></span><b>velora</b></div><div className="setup-kicker">LOCAL DEMO ACCOUNT</div><h1 id="login-title">Welcome back{profile.firstName ? `, ${profile.firstName}` : ''}.</h1><p className="setup-lede">Choose your colours, then open your saved {profile.persona.toLowerCase()} workspace.</p><ThemePicker value={palette} onChange={onPaletteChange}/><button className="setup-continue" onClick={onLogin}>Log in <ArrowUpRight size={16}/></button><small className="setup-privacy"><LockKeyhole size={12}/> This demo account stays on this device. It has no password or online sign-in.</small></section></div>;
+}
+
+function AccountSetup({ onCreate, palette, onPaletteChange }) {
   const [persona, setPersona] = useState(() => {
     try {
       const saved = window.localStorage.getItem('velora-onboarding-choice');
@@ -41,7 +73,7 @@ function AccountSetup({ onCreate }) {
   function create(event) {
     event.preventDefault();
     if (!persona) return;
-    onCreate({ id: `account-${Date.now()}`, persona, firstName: firstName.trim().slice(0, 32), createdAt: new Date().toISOString() });
+    onCreate({ id: `account-${Date.now()}`, persona, firstName: firstName.trim().slice(0, 32), createdAt: new Date().toISOString() }, persona === 'Kid' ? 'green-light' : palette);
   }
 
   function choosePersona(value) {
@@ -50,7 +82,7 @@ function AccountSetup({ onCreate }) {
     catch { /* The selection remains available for this setup flow. */ }
   }
 
-  return <div className="account-setup-backdrop"><section className="account-setup" role="dialog" aria-modal="true" aria-labelledby="setup-title"><div className="setup-brand"><span className="brand-mark"><span/><span/><span/></span><b>velora</b></div><div className="setup-kicker">A FRESH START · STEP {step + 1} OF 2</div>{step === 0 ? <><h1 id="setup-title">Your money, on your terms.</h1><p className="setup-lede">Build a personal planning space from zero. Choose the experience that fits you. This creates a local simulation profile—not a bank, brokerage, or real-money account.</p><div className="setup-audiences">{audience.map(option => <button type="button" key={option.id} className={persona === option.id ? 'setup-audience selected' : 'setup-audience'} onClick={() => choosePersona(option.id)} aria-pressed={persona === option.id}><span className="setup-audience-icon">{option.icon}</span><span><b>{option.title}</b><small>{option.copy}</small></span><span className="setup-radio">{persona === option.id ? <i/> : null}</span></button>)}</div><button className="setup-continue" disabled={!persona} onClick={() => setStep(1)}>Continue <ArrowUpRight size={16}/></button><small className="setup-privacy"><LockKeyhole size={12}/> No sign-in required · your profile is saved in this browser</small></> : <form onSubmit={create}><h1 id="setup-title">Let's make it yours{firstName.trim() ? `, ${firstName.trim()}` : ''}.</h1><p className="setup-lede">Your {persona.toLowerCase()} workspace starts with $0 cash, no holdings, and no invented bills. Add only the details you want to plan with.</p><label className="setup-name-field"><span>WHAT SHOULD WE CALL YOU? <small>OPTIONAL</small></span><input autoFocus value={firstName} onChange={event => setFirstName(event.target.value)} maxLength={32} placeholder="First name or nickname"/></label><div className="setup-empty-account"><Wallet size={18}/><span><b>Starting balance: $0.00</b><small>No example portfolio, transactions, or loans will be pre-filled.</small></span></div><label className="setup-understanding"><input type="checkbox" required/><span>I understand this is an educational paper-investing simulation. It cannot place real trades or move real money.</span></label><div className="setup-buttons"><button className="setup-continue" type="submit">Create my account <ArrowUpRight size={16}/></button></div><small className="setup-privacy"><LockKeyhole size={12}/> Profile and preferences are stored locally on this device</small></form>}</section></div>;
+  return <div className="account-setup-backdrop"><section className="account-setup" role="dialog" aria-modal="true" aria-labelledby="setup-title"><div className="setup-brand"><span className="brand-mark"><span/><span/><span/></span><b>velora</b></div><div className="setup-kicker">A FRESH START · STEP {step + 1} OF 2</div>{step === 0 ? <><h1 id="setup-title">Your money, on your terms.</h1><p className="setup-lede">Build a personal planning space from zero. Choose the experience that fits you. This creates a local simulation profile—not a bank, brokerage, or real-money account.</p><div className="setup-audiences">{audience.map(option => <button type="button" key={option.id} className={persona === option.id ? 'setup-audience selected' : 'setup-audience'} onClick={() => choosePersona(option.id)} aria-pressed={persona === option.id}><span className="setup-audience-icon">{option.icon}</span><span><b>{option.title}</b><small>{option.copy}</small></span><span className="setup-radio">{persona === option.id ? <i/> : null}</span></button>)}</div><button className="setup-continue" disabled={!persona} onClick={() => setStep(1)}>Continue <ArrowUpRight size={16}/></button><small className="setup-privacy"><LockKeyhole size={12}/> No sign-in required · your profile is saved in this browser</small></> : <form onSubmit={create}><h1 id="setup-title">Let's make it yours{firstName.trim() ? `, ${firstName.trim()}` : ''}.</h1><p className="setup-lede">Your {persona.toLowerCase()} workspace starts with $0 cash, no holdings, and no invented bills. Add only the details you want to plan with.</p><label className="setup-name-field"><span>WHAT SHOULD WE CALL YOU? <small>OPTIONAL</small></span><input autoFocus value={firstName} onChange={event => setFirstName(event.target.value)} maxLength={32} placeholder="First name or nickname"/></label>{persona !== 'Kid' && <div className="setup-theme-picker"><b>Choose your colours</b><small>You can change these when you log in later.</small><ThemePicker value={palette} onChange={onPaletteChange}/></div>}<div className="setup-empty-account"><Wallet size={18}/><span><b>Starting balance: $0.00</b><small>No example portfolio, transactions, or loans will be pre-filled.</small></span></div><label className="setup-understanding"><input type="checkbox" required/><span>I understand this is an educational paper-investing simulation. It cannot place real trades or move real money.</span></label><div className="setup-buttons"><button className="setup-continue" type="submit">Create my account <ArrowUpRight size={16}/></button></div><small className="setup-privacy"><LockKeyhole size={12}/> Profile and preferences are stored locally on this device</small></form>}</section></div>;
 }
 
 function CashFlowChart({ forecast, reserve }) {
@@ -176,12 +208,11 @@ function PaperTradeAgent({ plan, asset, cadence, rails, forecast, safeSurplus, r
 }
 
 function App() {
-  const [accountProfile, setAccountProfile] = useState(() => readAccountProfile() || {
-    id: 'velora-practice-default', persona: 'Adult', firstName: '', createdAt: new Date().toISOString(), isPractice: true,
-  });
+  const [accountProfile, setAccountProfile] = useState(readActiveAccountProfile);
   const persona = accountProfile?.persona || 'Adult';
-  const [activePage, setActivePage] = useState('Trading');
-  const [darkMode, setDarkMode] = useState(() => window.localStorage.getItem('velora-theme') === 'dark');
+  const [activePage, setActivePage] = useState('Overview');
+  const [selectedPalette, setSelectedPalette] = useState(readPalette);
+  const [darkMode, setDarkMode] = useState(() => themeOptions.find(option => option.id === readPalette())?.mode === 'dark');
   const [paperCash, setPaperCash] = useState(() => {
     try { return Number(JSON.parse(window.localStorage.getItem('velora-paper-portfolio') || '{}').cash) || 0; }
     catch { return 0; }
@@ -235,9 +266,17 @@ function App() {
   const personaCopy = persona === 'Kid' ? 'A playful learning view with pretend dollars and a small starter buffer.' : persona === 'Teen' ? 'School, first paychecks, and big goals—in one teen-friendly plan.' : 'A CFO-style view of cash flow, obligations, and what-if decisions.';
 
   useEffect(() => {
-    try { window.localStorage.setItem('velora-theme', darkMode ? 'dark' : 'light'); }
+    const choice = themeOptions.find(option => option.id === selectedPalette);
+    try {
+      window.localStorage.setItem('velora-theme', darkMode ? 'dark' : 'light');
+      window.localStorage.setItem('velora-palette', choice?.id || 'green-light');
+    }
     catch { /* Theme remains active for this session. */ }
-  }, [darkMode]);
+  }, [darkMode, selectedPalette]);
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [activePage]);
 
   useEffect(() => {
     try { window.localStorage.setItem('velora-custom-events', JSON.stringify(customEvents)); }
@@ -249,8 +288,26 @@ function App() {
     catch { /* The displayed debt plan remains usable for this browser session. */ }
   }, [debtPayments]);
 
-  function createAccount(profile) {
+  function applyPalette(paletteId) {
+    const choice = themeOptions.find(option => option.id === paletteId);
+    if (!choice) return;
+    setSelectedPalette(choice.id);
+    setDarkMode(choice.mode === 'dark');
+  }
+
+  function toggleColorMode() {
+    const nextMode = darkMode ? 'light' : 'dark';
+    const accent = themeOptions.find(option => option.id === selectedPalette)?.palette || 'green';
+    const match = themeOptions.find(option => option.palette === accent && option.mode === nextMode)
+      || themeOptions.find(option => option.mode === nextMode);
+    if (match) setSelectedPalette(match.id);
+    setDarkMode(nextMode === 'dark');
+  }
+
+  function createAccount(profile, paletteId) {
     window.localStorage.setItem('velora-account-profile', JSON.stringify(profile));
+    window.localStorage.removeItem('velora-session-ended');
+    if (profile.persona !== 'Kid') applyPalette(paletteId || selectedPalette);
     window.localStorage.setItem('velora-paper-portfolio', JSON.stringify({ cash: 0, positions: {}, orders: [] }));
     window.localStorage.setItem('velora-custom-events', '[]');
     window.localStorage.setItem('velora-debt-payments', JSON.stringify({ card: 0, student: 0, mortgage: 0 }));
@@ -282,7 +339,7 @@ function App() {
 
   function createNewAccount() {
     if (!window.confirm('Create a new account? This permanently replaces this browser’s local profile, paper holdings, order history, and plan settings.')) return;
-    for (const key of ['velora-account-profile', 'velora-paper-portfolio', 'velora-custom-events', 'velora-debt-payments', 'velora-auto-invest']) window.localStorage.removeItem(key);
+    for (const key of ['velora-account-profile', 'velora-paper-portfolio', 'velora-custom-events', 'velora-debt-payments', 'velora-auto-invest', 'velora-session-ended']) window.localStorage.removeItem(key);
     setAccountProfile(null);
     setPaperCash(0);
     setPurchase(0);
@@ -305,6 +362,25 @@ function App() {
     setLinkedInstitution('');
     setPlaidAccessToken('');
     setSandboxTransfers([]);
+  }
+
+  function logIn() {
+    const profile = readAccountProfile();
+    if (!profile) return;
+    window.localStorage.removeItem('velora-session-ended');
+    if (profile.persona !== 'Kid') applyPalette(selectedPalette);
+    setAccountProfile(profile);
+    setActivePage('Overview');
+  }
+
+  function logOut() {
+    try { window.localStorage.setItem('velora-session-ended', 'true'); }
+    catch { /* The in-memory session still ends if storage is unavailable. */ }
+    setPlaidAccessToken('');
+    setLinkedAccount(null);
+    setLinkedInstitution('');
+    setAccountProfile(null);
+    setActivePage('Overview');
   }
 
   async function plaidRequest(payload) {
@@ -386,25 +462,30 @@ function App() {
   }
 
   const pages = [
-    { label: 'Trading', icon: Activity },
     { label: 'Overview', icon: LayoutDashboard },
+    { label: 'Trading', icon: Activity },
+    { label: 'Markets', icon: CandlestickChart },
+    { label: 'Portfolio', icon: BriefcaseBusiness },
     { label: 'Planning', icon: CalendarDays },
+    { label: 'Tools', icon: SlidersHorizontal },
   ];
+  const savedAccount = readAccountProfile();
 
-  return <div className={`app-shell ${persona === 'Kid' ? 'kid-theme' : 'professional-theme'}`} data-theme={darkMode ? 'dark' : 'light'}>
+  return <div className={`app-shell ${persona === 'Kid' ? 'kid-theme' : 'professional-theme'}`} data-theme={darkMode ? 'dark' : 'light'} data-palette={themeOptions.find(option => option.id === selectedPalette)?.palette || 'green'}>
     <aside className="sidebar">
       <a className="brand sidebar-brand" href="#top" aria-label="Velora overview"><span className="brand-mark"><span/><span/><span/></span><span>velora</span></a>
       <div className="sidebar-section-label">WORKSPACE</div>
       <nav className="sidebar-nav" aria-label="Main navigation">{pages.map(({ label, icon: Icon }) => <button key={label} className={activePage === label ? 'sidebar-link active' : 'sidebar-link'} onClick={() => setActivePage(label)} aria-current={activePage === label ? 'page' : undefined}><Icon size={18}/><span>{persona === 'Kid' && label === 'Portfolio' ? 'My stocks' : label === 'Markets' && persona === 'Kid' ? 'Stock shop' : label}</span></button>)}</nav>
       {persona === 'Kid' && <div className="kid-glossary"><b>Money words</b><p><strong>Stock</strong> · a tiny piece of a company.</p><p><strong>Price</strong> · what one piece costs right now.</p><p><strong>Paper money</strong> · pretend dollars for practice.</p><p><strong>Risk</strong> · the chance your pretend money goes down.</p></div>}
-      <div className="sidebar-bottom"><button className="theme-toggle" onClick={() => setDarkMode(value => !value)}><span className="theme-toggle-icon">{darkMode ? <Sun size={16}/> : <Moon size={16}/>}</span>{darkMode ? 'Light mode' : 'Dark mode'}</button><div className="sidebar-profile"><span className="locked-account-avatar">{(accountProfile?.firstName || persona).slice(0, 1).toUpperCase()}</span><span><b>{accountProfile?.firstName || `${persona} account`}</b><small>{persona} account</small></span></div></div>
+      <div className="sidebar-bottom"><button className="theme-toggle" onClick={toggleColorMode}><span className="theme-toggle-icon">{darkMode ? <Sun size={16}/> : <Moon size={16}/>}</span>{darkMode ? 'Light mode' : 'Dark mode'}</button><div className="sidebar-profile"><span className="locked-account-avatar">{(accountProfile?.firstName || persona).slice(0, 1).toUpperCase()}</span><span><b>{accountProfile?.firstName || `${persona} account`}</b><small>{persona} account</small></span></div></div>
     </aside>
     <div className="workspace">
     <header className="topbar">
-      <div className="top-actions"><span className="status"><i/> Practice account</span><span className="engine"><Sparkles size={13}/> Gemini {aiStatus === 'live' ? 'connected' : 'optional'}</span><button className="new-account-button" onClick={createNewAccount}>New account</button><button className="icon-btn" aria-label="Notifications"><Bell size={18}/></button><button className="avatar" aria-label="Account profile">{(accountProfile?.firstName || persona).slice(0, 1).toUpperCase()}</button></div>
+      <div className="top-actions"><span className="status"><i/> {linkedAccount ? 'Sandbox bank linked' : 'No bank linked'}</span><span className="engine"><Sparkles size={13}/> Gemini {aiStatus === 'live' ? 'connected' : 'optional'}</span>{persona !== 'Kid' && (accountProfile || savedAccount) && <button className="session-button" onClick={accountProfile ? logOut : logIn}>{accountProfile ? 'Log out' : 'Log in'}</button>}<button className="new-account-button" onClick={createNewAccount}>New account</button><button className="icon-btn" aria-label="Notifications"><Bell size={18}/></button><button className="avatar" aria-label="Account profile">{(accountProfile?.firstName || persona).slice(0, 1).toUpperCase()}</button></div>
     </header>
     <main id="top" className="dashboard">
       <div className="page-title-row"><div><div className="eyebrow">{activePage.toUpperCase()}</div><h1>{activePage === 'Overview' ? (accountProfile?.firstName ? `Welcome, ${accountProfile.firstName}` : displayName) : activePage === 'Markets' && persona === 'Kid' ? 'Stock shop' : activePage}</h1><p>{activePage === 'Overview' ? personaCopy : activePage === 'Trading' ? 'Set your practice budget and risk level. See each automatic buy, sell, or wait decision.' : activePage === 'Markets' ? (persona === 'Kid' ? 'See what company prices are doing. Practice with pretend money.' : 'Explore intraday prices and historical market moves.') : activePage === 'Portfolio' ? 'Your pretend cash, investments, and practice orders.' : activePage === 'Planning' ? 'Plan upcoming money in and money out.' : 'Extra ways to explore your plan.'}</p></div><span className="page-persona-tag">{persona} account · Paper mode</span></div>
+      <div key={activePage} className="page-content">
       {activePage === 'Trading' && <TradingDesk autoStart/>}
       {activePage === 'Overview' && <>
       <section className="summary-grid" aria-label={`${persona} account overview`}>
@@ -430,11 +511,12 @@ function App() {
       <section className="panel decision-panel"><div className="section-title"><div className="section-icon coral-icon"><Wallet size={18}/></div><div><div className="eyebrow">WHAT-IF PLANNER</div><h2>Try a decision first.</h2></div></div><p className="section-description">See what a purchase could change across your whole month.</p><form className="purchase-input" onSubmit={event => {event.preventDefault();setPurchase(Number(purchaseInput.replace(/[^0-9.]/g,''))||0)}}><span>$</span><input value={purchaseInput} onChange={event => setPurchaseInput(event.target.value)} placeholder="1,200 laptop" aria-label="Purchase amount"/><button type="submit">Preview <span>→</span></button></form><div className="quick-picks"><span>Try</span><button onClick={() => {setPurchaseInput('250');setPurchase(250)}}>$250 weekend trip</button><button onClick={() => {setPurchaseInput('1,200');setPurchase(1200)}}>$1,200 laptop</button>{purchase>0&&<button onClick={() => {setPurchase(0);setPurchaseInput('')}}>Clear</button>}</div><div className="impact-box"><div className="impact-heading"><span className="impact-dot"/> LIVE SCENARIO</div><div className="impact-row"><span>Purchase impact</span><b>−{money(purchase)}</b></div><div className="impact-row"><span>Projected lowest balance</span><b className={lowestBalance<reserve?'coral-text':''}>{money(lowestBalance)}</b></div><div className="impact-message"><ShieldCheck size={14}/>{lowestBalance>=reserve?`Your ${money(reserve)} reserve remains protected.`:'This scenario dips into the protected reserve.'}</div></div><div className="ai-footnote"><Activity size={13}/> Forecast recalculates instantly · sample data only</div></section>
       <section className="panel subscriptions-panel"><div className="section-title"><div className="section-icon coral-icon"><CreditCard size={18}/></div><div><div className="eyebrow">RECURRING EXPENSES</div><h2>Your recurring charges.</h2></div></div>{recurringTotal > 0 ? <><div className="subscription-total"><span>Monthly total</span><b>{money(recurringTotal,2)}<small>/mo</small></b></div><div className="subscription-list">{subscriptions.map(item => {const isCancelled=cancelled.includes(item.name);return <div className={isCancelled?'subscription canceled':'subscription'} key={item.name}><div className="service-icon" style={{'--service':item.color}}>{item.icon}</div><div className="service-name"><b>{item.name}</b><small>{isCancelled?'Cancellation simulated':item.detail}</small></div><div className="service-cost">{money(item.amount,2)}<small>/mo</small></div><button className={isCancelled?'toggle on':'toggle'} onClick={() => setCancelled(isCancelled ? cancelled.filter(name => name !== item.name) : [...cancelled, item.name])} aria-label={`${isCancelled?'Restore':'Simulate cancellation'} ${item.name}`}><i/></button></div>})}</div></> : <div className="subscriptions-empty"><CreditCard size={18}/><span><b>No recurring charges added</b><small>Your account is empty by design. Add expected bills to the payment calendar when you’re ready.</small></span></div>}<div className="nudge"><div className="nudge-spark"><Sparkles size={15}/></div><div><span className="nudge-label">PLAN INSIGHT</span><p>{recurringTotal ? 'Recurring charges are planning examples; changing a toggle never modifies a service account.' : 'Once you add recurring items, the forecast and cash-reserve checks will update automatically.'}</p></div></div></section>
       </div>}
+      </div>
       <footer className="page-footer"><span><LockKeyhole size={13}/> Sample practice balance · no linked bank by default</span><span>Simulated trades · browser-local practice account</span><span className="footer-right">Built for clearer decisions</span></footer>
     </main>
     <div className="disclaimer"><span><ShieldCheck size={15}/> <b>Paper investing only.</b> This educational simulation cannot place real trades, move money, or provide formal financial advice.</span></div>
     </div>
-    {!accountProfile?.createdAt && <AccountSetup onCreate={createAccount}/>}
+    {!accountProfile && (savedAccount ? <LocalLogin profile={savedAccount} palette={selectedPalette} onPaletteChange={applyPalette} onLogin={logIn}/> : <AccountSetup onCreate={createAccount} palette={selectedPalette} onPaletteChange={applyPalette}/>)}
   </div>;
 }
 

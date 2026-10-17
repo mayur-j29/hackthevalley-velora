@@ -9,7 +9,7 @@ npm install
 npm run dev
 ```
 
-The introduction asks for a Kid, Teen, or Adult profile, then locks that choice on this device. There is no back-to-profile control; explicitly creating a new local account erases and replaces the current browser profile and paper ledger. A new profile starts with $0, no portfolio positions, no recurring charges, and no invented cash-flow events. Add only the income, bills, or debt you want to model. This profile is not authentication and does not create an online financial account.
+The introduction asks for a Kid, Teen, or Adult profile, then saves that choice on this device. Adult and Teen profiles have local demo login and logout controls; logging out preserves the profile and paper ledger, and logging back in lets the user choose a color theme. This is not password-based authentication and does not create an online financial account. Explicitly creating a new local account erases and replaces the current browser profile and paper ledger. A new profile starts with $0, no portfolio positions, no recurring charges, and no invented cash-flow events. Add only the income, bills, or debt you want to model.
 
 Simulated income may be recorded to fund the local paper portfolio. The opt-in recurring-investment schedule runs only as a paper account: while this browser is open, it checks each due cycle against refreshed price marks, virtual buying power, current forecast surplus, and enabled rules before updating the local ledger. Market quotes and portfolio marks refresh every minute while their page is open. Quotes may be delayed. The schedule pauses when the app is closed and does not backfill missed cycles. The Kid profile gets supervised-learning messaging and cannot enable the scheduler. No broker connection is used.
 

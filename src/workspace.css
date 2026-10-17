@@ -224,3 +224,74 @@
 .app-shell[data-theme="dark"] .setup-audience { background:#19251e; border-color:#455b4d; color:#edf4ef; }
 .app-shell[data-theme="dark"] .setup-audience.selected { background:#243a2c; border-color:#6aa17b; }
 .app-shell[data-theme="dark"] .setup-empty-account { background:#26372d; border-color:#455b4d; }
+
+/* Sign-in theme picker and color accents. */
+.theme-choice-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin:12px 0 14px; }
+.theme-choice { min-width:0; display:flex; align-items:center; gap:9px; padding:9px; border:1px solid #e0e7e1; border-radius:10px; background:#fff; color:#263a2d; text-align:left; }
+.theme-choice:hover,.theme-choice.selected { border-color:#578d65; box-shadow:0 0 0 2px #578d651a; }
+.theme-swatches { display:flex; flex:none; width:35px; height:29px; overflow:hidden; border:1px solid #d7ded8; border-radius:6px; }
+.theme-swatches i { flex:1; }
+.theme-choice>span:nth-child(2) { min-width:0; flex:1; }
+.theme-choice b,.theme-choice small { display:block; }
+.theme-choice b { font-size:11px; }
+.theme-choice small { margin-top:3px; color:#718077; font-size:9px; }
+.theme-radio { width:15px; height:15px; flex:none; display:grid; place-items:center; border:1px solid #9ca9a0; border-radius:50%; }
+.theme-choice.selected .theme-radio { border-color:#347954; }
+.theme-radio i { width:7px; height:7px; border-radius:50%; background:#347954; }
+.setup-theme-picker { margin:13px 0; }
+.setup-theme-picker> b,.setup-theme-picker>small { display:block; }
+.setup-theme-picker> b { color:#354b3b; font-size:12px; }
+.setup-theme-picker>small { margin-top:3px; color:#7d8b81; font-size:10px; }
+.login-setup>.setup-continue { width:100%; }
+.session-button { min-height:36px; padding:0 12px; border:1px solid #ffffff55; border-radius:8px; background:#ffffff10; color:#f1f6f2; font-size:13px; font-weight:650; }
+.session-button:hover { background:#ffffff22; }
+.sidebar-nav .sidebar-link:first-child { order:-1; }
+.app-shell { scroll-behavior:smooth; }
+.page-content { animation:page-arrive .24s ease-out both; }
+.sidebar-link,.theme-toggle,.session-button,.new-account-button,.summary-card,.panel,.theme-choice { transition:background-color .18s ease,border-color .18s ease,color .18s ease,box-shadow .18s ease,transform .18s ease; }
+.sidebar-link:hover { transform:translateX(2px); }
+.theme-choice:active,.session-button:active,.sidebar-link:active { transform:scale(.985); }
+@keyframes page-arrive { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:translateY(0); } }
+
+.app-shell[data-palette="blue"] { --shell-accent:#3975d5; --shell-canvas:#f3f7fd; --shell-line:#dce5f2; }
+.app-shell[data-palette="blue"] .sidebar-link.active { color:#245cb4; background:#e5eefc; }
+.app-shell[data-palette="blue"] .sidebar-brand .brand-mark span { background:#8db6fa; }
+.app-shell[data-palette="blue"] :is(.theme-toggle-icon,.section-icon,.chart-line,.live-price-line) { color:#3975d5; }
+.app-shell[data-palette="blue"] :is(.setup-continue,.market-replay-button,.paper-order-submit:not(:disabled),.connect-plaid-button,.sandbox-transfer-button,.calendar-add-button) { background:#2d65bd; }
+.app-shell[data-palette="blue"][data-theme="dark"] { --shell-accent:#8db6fa; --shell-canvas:#141d2b; --shell-line:#33465f; --shell-surface:#202d40; }
+.app-shell[data-palette="blue"][data-theme="dark"] .sidebar-link.active { color:#d8e7ff; background:#293d59; }
+.app-shell[data-palette="blue"][data-theme="dark"] :is(.setup-continue,.market-replay-button,.paper-order-submit:not(:disabled),.connect-plaid-button,.sandbox-transfer-button,.calendar-add-button) { background:#356dbf; }
+
+.app-shell[data-palette="green"] { --shell-accent:#347954; --shell-canvas:#f3f7f3; --shell-line:#dfe8df; }
+.app-shell[data-palette="green"] .sidebar-link.active { color:#245d3d; background:#e6f1e8; }
+.app-shell[data-palette="green"][data-theme="dark"] { --shell-accent:#8ad0a1; --shell-canvas:#141d18; --shell-line:#34463d; --shell-surface:#202d26; }
+.app-shell[data-palette="green"][data-theme="dark"] .sidebar-link.active { color:#c3f0cd; background:#2b4938; }
+
+.app-shell[data-palette="gold"] { --shell-accent:#9b742f; --shell-canvas:#f6f0e2; --shell-line:#e7dcc1; --shell-surface:#fffaf0; }
+.app-shell[data-palette="gold"] .sidebar-link.active { color:#75551e; background:#f0e5ca; }
+.app-shell[data-palette="gold"] .sidebar-brand .brand-mark span { background:#e6c477; }
+.app-shell[data-palette="gold"] :is(.setup-continue,.market-replay-button,.paper-order-submit:not(:disabled),.connect-plaid-button,.sandbox-transfer-button,.calendar-add-button) { background:#89651f; }
+.app-shell[data-palette="gold"][data-theme="dark"] { --shell-accent:#e3bd6a; --shell-canvas:#1c1a15; --shell-line:#4e4630; --shell-surface:#29251b; }
+.app-shell[data-palette="gold"][data-theme="dark"] .sidebar-link.active { color:#ffedc2; background:#423a25; }
+.app-shell[data-palette="gold"][data-theme="dark"] :is(.setup-continue,.market-replay-button,.paper-order-submit:not(:disabled),.connect-plaid-button,.sandbox-transfer-button,.calendar-add-button) { background:#85652a; }
+
+.app-shell[data-palette="slate"][data-theme="dark"] { --shell-accent:#bdc8d4; --shell-canvas:#191d22; --shell-line:#3d454e; --shell-surface:#252a31; }
+.app-shell[data-palette="slate"][data-theme="dark"] .sidebar-link.active { color:#f1f4f7; background:#3a424c; }
+.app-shell[data-palette="slate"][data-theme="dark"] :is(.setup-continue,.market-replay-button,.paper-order-submit:not(:disabled),.connect-plaid-button,.sandbox-transfer-button,.calendar-add-button) { background:#4d5966; }
+.app-shell[data-theme="dark"] .theme-choice { background:#19251e; color:#edf4ef; border-color:#455b4d; }
+.app-shell[data-theme="dark"] .theme-choice small { color:#b5c2b8; }
+.app-shell[data-theme="dark"] .setup-theme-picker>b { color:#edf4ef; }
+.app-shell[data-theme="dark"] .setup-theme-picker>small { color:#b5c2b8; }
+@media(max-width:650px) { .session-button { min-height:32px; padding:0 9px; font-size:12px; } }
+@media(max-width:560px) {
+  .theme-choice-grid { gap:6px; }
+  .theme-choice { gap:6px; padding:7px; }
+  .theme-swatches { width:27px; height:25px; }
+  .theme-choice b { font-size:10px; }
+  .theme-choice small { font-size:8px; }
+}
+@media(prefers-reduced-motion:reduce) {
+  .app-shell { scroll-behavior:auto; }
+  .page-content { animation:none; }
+  .sidebar-link,.theme-toggle,.session-button,.new-account-button,.summary-card,.panel,.theme-choice { transition:none; }
+}
