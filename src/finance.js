@@ -36,14 +36,18 @@ export function getSafeSurplus(forecast, reserve = essentialReserve) {
 // can be generated separately; it must never change the verdict.
 export function evaluateSimulatedTrade({ amount, safeSurplus, railsEnabled }) {
   const value = Number(amount);
+  const availableSurplus = Number(safeSurplus);
   if (!Number.isFinite(value) || value <= 0) {
     return { verdict: 'blocked', reason: 'Enter an amount greater than $0.' };
   }
   if (!railsEnabled) {
-    return { verdict: 'pass', unguarded: true, reason: 'Safety rails are off. The simulation may overlap planned essentials.' };
+    return { verdict: 'blocked', reason: 'Safety rails are off. Turn them on before running any investment simulation.' };
   }
-  if (value > safeSurplus) {
-    return { verdict: 'blocked', reason: `The order exceeds the $${safeSurplus.toLocaleString()} safe surplus.` };
+  if (!Number.isFinite(availableSurplus) || availableSurplus < 0) {
+    return { verdict: 'blocked', reason: 'The forecast surplus is unavailable. Refresh the forecast and try again.' };
+  }
+  if (value > availableSurplus) {
+    return { verdict: 'blocked', reason: `The order exceeds the $${availableSurplus.toLocaleString()} safe surplus.` };
   }
   return { verdict: 'pass', reason: 'The order fits within the projected safe surplus.' };
 }
@@ -55,8 +59,22 @@ export function evaluateSimulatedTrade({ amount, safeSurplus, railsEnabled }) {
 export function simulateAutoInvest({ forecast, amount, cadence = 7, reserve = essentialReserve, floor = 0, railsEnabled = true }) {
   const contribution = Number(amount);
   const interval = Number(cadence);
-  if (!Number.isFinite(contribution) || contribution <= 0 || !Number.isFinite(interval) || interval < 1) {
+  if (!Number.isFinite(contribution) || contribution <= 0 || !Number.isInteger(interval) || interval < 1) {
     return { executions: [], blocked: [], total: 0, endingBalance: forecast.at(-1)?.value ?? startingBalance, reason: 'Choose a contribution and schedule to simulate.' };
+  }
+
+  if (!railsEnabled) {
+    return {
+      executions: [],
+      blocked: Array.from({ length: Math.floor((forecast.length - 1) / interval) }, (_, index) => {
+        const day = (index + 1) * interval;
+        return { day, date: forecast[day]?.date, amount: contribution, safeNow: 0 };
+      }),
+      total: 0,
+      endingBalance: forecast.at(-1)?.value ?? startingBalance,
+      lowestBalance: Math.min(...forecast.map(point => point.value)),
+      reason: 'Safety rails are off; every simulated contribution is blocked.',
+    };
   }
 
   const projected = forecast.map(point => ({ ...point, value: point.value }));
@@ -66,7 +84,7 @@ export function simulateAutoInvest({ forecast, amount, cadence = 7, reserve = es
     const currentBalance = projected[day].value;
     const lowestAfter = Math.min(...projected.slice(day).map(point => point.value));
     const safeNow = Math.floor(Math.min(currentBalance - floor, lowestAfter - reserve - floor));
-    const allowed = !railsEnabled || contribution <= Math.max(0, safeNow);
+    const allowed = contribution <= Math.max(0, safeNow);
     if (allowed) {
       executions.push({ day, date: projected[day].date, amount: contribution });
       for (let i = day; i < projected.length; i += 1) projected[i].value -= contribution;

@@ -21,6 +21,10 @@ Gemini receives only bounded sample aggregates and the user's short question. It
 
 All balances and events are synthetic. Velora does not connect to a bank, execute or route orders, move funds, or provide formal financial advice. Historic market replay is illustrative, not a prediction.
 
+Recurring auto-invest is a paper simulation only. The deterministic rules engine blocks investment simulations when safety rails are disabled or the forecast surplus is invalid, and it checks each scheduled contribution against the remaining forecast and protected reserve. Plaid is Sandbox-only; Sandbox transfers create fake test records and do not place stock orders. Gemini provides explanations only and cannot authorize or execute transactions. A live brokerage integration is not included.
+
+Run the safety-engine regression tests with `npm test` and build the frontend with `npm run build`.
+
 ## Plaid Sandbox account and transfer flow
 
 1. Create a free Plaid developer account at [dashboard.plaid.com/signup](https://dashboard.plaid.com/signup).
