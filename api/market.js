@@ -5,7 +5,7 @@ const SYMBOLS = Object.freeze({
   MSFT: 'MSFT',
   TSLA: 'TSLA',
 });
-const PERIODS = Object.freeze({ '6mo': '6mo', '1y': '1y', '5y': '5y' });
+const PERIODS = Object.freeze({ '1d': '1d', '6mo': '6mo', '1y': '1y', '5y': '5y' });
 const MARKET_ORIGIN = 'https://query1.finance.yahoo.com';
 const REQUEST_TIMEOUT_MS = 10000;
 
@@ -13,8 +13,8 @@ export default async function handler(request, response) {
   if (request.method !== 'GET') return response.status(405).json({ error: 'Method not allowed' });
 
   const params = new URL(request.url || '/', 'http://localhost').searchParams;
-  const range = PERIODS[params.get('range') || '1y'];
-  if (!range) return response.status(400).json({ error: 'Choose a supported history window: 6mo, 1y, or 5y.' });
+  const range = PERIODS[params.get('range') || '1d'];
+  if (!range) return response.status(400).json({ error: 'Choose a supported window: 1d, 6mo, 1y, or 5y.' });
 
   const requestedSymbols = params.has('symbols')
     ? [...new Set((params.get('symbols') || '').split(',').map(value => value.trim()).filter(Boolean))]
@@ -37,7 +37,8 @@ async function fetchHistory(requestedSymbol, range) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
-    const upstream = await fetch(`${MARKET_ORIGIN}/v8/finance/chart/${symbol}?range=${range}&interval=1d&events=div%2Csplits`, {
+    const interval = range === '1d' ? '1m' : '1d';
+    const upstream = await fetch(`${MARKET_ORIGIN}/v8/finance/chart/${symbol}?range=${range}&interval=${interval}&events=div%2Csplits`, {
       headers: { 'User-Agent': 'VeloraHackathon/1.0 (historical paper simulation)' },
       signal: controller.signal,
     });
@@ -47,10 +48,14 @@ async function fetchHistory(requestedSymbol, range) {
     const result = payload.chart?.result?.[0];
     if (payload.chart?.error || !result) throw new Error(`No historical prices were returned for ${symbol}.`);
     const timestamps = result.timestamp || [];
-    const closes = result.indicators?.adjclose?.[0]?.adjclose || result.indicators?.quote?.[0]?.close || [];
+    const closes = range === '1d'
+      ? result.indicators?.quote?.[0]?.close || []
+      : result.indicators?.adjclose?.[0]?.adjclose || result.indicators?.quote?.[0]?.close || [];
     const points = timestamps.flatMap((timestamp, index) => {
       const close = Number(closes[index]);
-      return Number.isFinite(close) && close > 0 ? [{ date: new Date(timestamp * 1000).toISOString().slice(0, 10), close: Number(close.toFixed(4)) }] : [];
+      if (!Number.isFinite(close) || close <= 0) return [];
+      const date = new Date(timestamp * 1000).toISOString();
+      return [{ date: range === '1d' ? date : date.slice(0, 10), close: Number(close.toFixed(4)) }];
     }).slice(-1260);
     if (points.length < 2) throw new Error(`Not enough valid history for ${symbol}.`);
 
@@ -60,6 +65,9 @@ async function fetchHistory(requestedSymbol, range) {
       displaySymbol: requestedSymbol === 'S&P 500' || requestedSymbol === 'SPY' ? 'S&P 500 ETF proxy (SPY)' : symbol,
       currency: meta.currency || 'USD',
       period: range,
+      interval,
+      marketState: meta.marketState || 'UNKNOWN',
+      previousClose: Number(meta.chartPreviousClose || meta.previousClose) || null,
       points,
       source: 'Yahoo Finance chart API',
       fetchedAt: new Date().toISOString(),

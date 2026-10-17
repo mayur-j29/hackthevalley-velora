@@ -32,9 +32,19 @@ function HistoryChart({ result }) {
   </div>;
 }
 
+function PriceChart({ points, symbol }) {
+  const values = points.map(point => point.close);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const span = max - min || 1;
+  const line = values.map((value, index) => `${24 + index / Math.max(1, values.length - 1) * 752},${112 - (value - min) / span * 86}`).join(' ');
+  const rising = values.at(-1) >= values[0];
+  return <div className="live-price-chart"><div className="live-chart-heading"><b>{symbol === 'S&P 500' ? 'S&P 500 ETF proxy' : symbol} · price today</b><span>{money(min)} – {money(max)}</span></div><svg viewBox="0 0 800 140" role="img" aria-label={`${symbol} intraday prices`}><defs><linearGradient id="marketPriceFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor={rising ? '#37845c' : '#c56b5a'} stopOpacity=".2"/><stop offset="1" stopColor={rising ? '#37845c' : '#c56b5a'} stopOpacity="0"/></linearGradient></defs>{[0,1,2].map(row => <line key={row} x1="24" x2="776" y1={24 + row * 42} y2={24 + row * 42} className="replay-grid"/>)}<polygon points={`24,116 ${line} 776,116`} fill="url(#marketPriceFill)"/><polyline points={line} className={rising ? 'live-price-line' : 'live-price-line down'}/></svg><div className="live-chart-range"><span>Market open</span><span>Latest update</span></div></div>;
+}
+
 export default function MarketReplay({ safeSurplus, reserve, rails, persona = 'Adult', initialSymbol = 'S&P 500', onSymbolChange }) {
   const [symbol, setSymbol] = useState(initialSymbol);
-  const [range, setRange] = useState('1y');
+  const [range, setRange] = useState('1d');
   const [amount, setAmount] = useState('500');
   const [history, setHistory] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -73,6 +83,11 @@ export default function MarketReplay({ safeSurplus, reserve, rails, persona = 'A
   }, [symbol, range, refreshKey]);
 
   useEffect(() => {
+    const timer = window.setInterval(() => setRefreshKey(value => value + 1), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
     requestRef.current?.abort();
     setResult(null);
     setReview(null);
@@ -80,7 +95,7 @@ export default function MarketReplay({ safeSurplus, reserve, rails, persona = 'A
   }, [rails]);
 
   const close = history?.points.at(-1)?.close;
-  const previousClose = history?.points.at(-2)?.close;
+  const previousClose = range === '1d' ? history?.previousClose : history?.points.at(-2)?.close;
   const dayChange = close && previousClose ? (close / previousClose - 1) * 100 : null;
   const replay = result;
   const fetchFresh = () => setRefreshKey(value => value + 1);
@@ -144,12 +159,14 @@ export default function MarketReplay({ safeSurplus, reserve, rails, persona = 'A
   }
 
   return <section className="panel market-panel" aria-labelledby="market-title">
-    <div className="market-head"><div><div className="eyebrow">HISTORICAL MARKET LAB <span className="market-real-pill"><i/> REAL PRICE HISTORY</span></div><h2 id="market-title">Replay a paper investment against the past.</h2><p>See how one hypothetical lump-sum investment would have tracked over actual adjusted closing prices.</p></div><button type="button" className="market-refresh" onClick={fetchFresh} disabled={loading} aria-label="Refresh historical data"><RefreshCw size={15}/></button></div>
-    <div className="market-controls"><label><span>MARKET</span><div className="select-wrap"><select value={symbol} onChange={event => { setSymbol(event.target.value); onSymbolChange?.(event.target.value); }} aria-label="Historical market symbol">{options.map(option => <option key={option.symbol} value={option.symbol}>{option.label}</option>)}</select><ChevronDown size={15}/></div></label><label><span>HISTORY WINDOW</span><div className="select-wrap"><select value={range} onChange={event => setRange(event.target.value)} aria-label="Historical window"><option value="6mo">6 months</option><option value="1y">1 year</option><option value="5y">5 years</option></select><ChevronDown size={15}/></div></label><div className="market-quote"><small>LATEST ADJUSTED CLOSE</small><b>{loading ? 'Loading…' : close ? money(close) : '—'}</b>{!loading && dayChange !== null && <span className={dayChange >= 0 ? 'market-up' : 'market-down'}>{dayChange >= 0 ? '+' : ''}{dayChange.toFixed(2)}% last close</span>}</div></div>
+    <div className="market-head"><div><div className="eyebrow">MARKET WATCH <span className="market-real-pill"><i/> LIVE INTRADAY · MAY BE DELAYED</span></div><h2 id="market-title">Explore real market prices.</h2><p>Compare current prices and see how a practice investment would have moved over time.</p></div><button type="button" className="market-refresh" onClick={fetchFresh} disabled={loading} aria-label="Refresh market prices"><RefreshCw size={15}/></button></div>
+    <div className="market-controls"><label><span>COMPANY OR INDEX</span><div className="select-wrap"><select value={symbol} onChange={event => { setSymbol(event.target.value); onSymbolChange?.(event.target.value); }} aria-label="Market symbol">{options.map(option => <option key={option.symbol} value={option.symbol}>{option.label}</option>)}</select><ChevronDown size={15}/></div></label><label><span>PRICE HISTORY</span><div className="select-wrap"><select value={range} onChange={event => setRange(event.target.value)} aria-label="Price history range"><option value="1d">Today · refreshes each minute</option><option value="6mo">6 months</option><option value="1y">1 year</option><option value="5y">5 years</option></select><ChevronDown size={15}/></div></label><div className="market-quote"><small>{range === '1d' ? 'LATEST INTRADAY PRICE' : 'LATEST ADJUSTED CLOSE'}</small><b>{loading ? 'Loading…' : close ? money(close) : '—'}</b>{!loading && dayChange !== null && <span className={dayChange >= 0 ? 'market-up' : 'market-down'}>{dayChange >= 0 ? '+' : ''}{dayChange.toFixed(2)}% {range === '1d' ? 'today' : 'last close'}</span>}</div></div>
     {loading && <div className="market-loading" role="status"><span className="market-loader-orb"><Activity size={18}/></span><div><b>Loading verified price history</b><small>Fetching daily adjusted closes for {symbol}…</small></div><span className="market-loading-bar"/></div>}
     {!loading && error && <div className="market-error" role="alert"><AlertTriangle size={17}/><span><b>Price history not loaded</b><small>{error} Check your connection and retry.</small></span><button onClick={fetchFresh}>Retry</button></div>}
     {!loading && history && <>
-      <div className="market-data-meta"><span><i className="data-live-dot"/> {history.points.length} daily observations</span><span>{history.displaySymbol} · {history.source} · {history.currency} adjusted close</span></div>
+      <div className="market-data-meta"><span><i className="data-live-dot"/> {range === '1d' ? `${history.points.length} intraday price updates · refreshes every minute` : `${history.points.length} daily observations`}</span><span>{history.displaySymbol} · {history.source} · {history.currency} {range === '1d' ? 'prices' : 'adjusted close'}</span></div>
+      {history.points.length > 1 && <PriceChart points={history.points} symbol={symbol}/>}
+      <div className="intraday-price-card"><div><b>{symbol === 'S&P 500' ? 'S&P 500 ETF proxy' : symbol}</b><small>{history.marketState === 'REGULAR' ? 'Market is open' : 'Latest available market price'} · as of {history.points.at(-1)?.date ? new Date(history.points.at(-1).date).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '—'}</small></div><span className={dayChange >= 0 ? 'market-up' : 'market-down'}>{dayChange >= 0 ? '+' : ''}{(dayChange || 0).toFixed(2)}%</span></div>
       <form className="market-replay-form" onSubmit={runReplay}><label><span>HYPOTHETICAL STARTING AMOUNT</span><div className="amount-input"><b>$</b><input type="number" min="1" step="1" max={safeSurplus} value={amount} onChange={event => { setAmount(event.target.value); setResult(null); setReview(null); }} aria-label="Historical paper investment amount"/></div></label><div className="market-safe-cap"><ShieldCheck size={15}/><span>Current safe surplus<b>{money(safeSurplus, 0)}</b></span></div><button type="submit" className="market-replay-button" disabled={reviewing || loading}><Sparkles size={15}/>{reviewing ? 'Reviewing the replay…' : 'Replay paper investment'}<ArrowUpRight size={15}/></button></form>
       {!rails && <div className="market-rails-off"><ShieldCheck size={16}/><span><b>Safety rails are off</b><small>Historical prices remain visible, but rules block every paper investment until rails are enabled.</small></span></div>}
       {replay && replay.verdict === 'blocked' && <div className="market-verdict blocked" role="alert"><ShieldCheck size={15}/><span><b>RULES ENGINE · BLOCK</b><small>{replay.reason}</small></span></div>}
@@ -158,6 +175,6 @@ export default function MarketReplay({ safeSurplus, reserve, rails, persona = 'A
       {reviewing && <div className="market-loading" role="status"><span className="market-loader-orb"><Sparkles size={18}/></span><div><b>Gemini is explaining the replay</b><small>Rules made the decision; AI is reviewing historical context…</small></div><span className="market-loading-bar"/></div>}
       {review && <div className={`market-ai-review ${review.mode}`}><div><Sparkles size={14}/><b>{review.mode === 'live' ? 'GEMINI REVIEW' : 'LOCAL EXPLANATION'}</b></div><p>{review.answer}</p></div>}
     </>}
-    <div className="market-boundary"><ShieldCheck size={13}/> Read-only market data. Historical replay is informational, rules-checked, and never routes a brokerage order.</div>
+    <div className="market-boundary"><ShieldCheck size={13}/> Public market quotes may be delayed. Historical replay is informational and cannot predict future prices; all orders are pretend and stay in this browser.</div>
   </section>;
 }

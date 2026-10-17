@@ -76,8 +76,8 @@ export function simulateHistoricalInvestment({ amount, safeSurplus, railsEnabled
     profitLoss: endingValue - value,
     returnPct: (endingValue / value - 1) * 100,
     maxDrawdownPct: maxDrawdown * 100,
-    startDate: first.date,
-    endDate: last.date,
+    startDate: first.date.slice(0, 10),
+    endDate: last.date.slice(0, 10),
     equityCurve,
   };
 }
