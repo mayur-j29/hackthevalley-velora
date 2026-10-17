@@ -134,3 +134,24 @@
   .live-price-chart svg { height:120px; }
   .disclaimer { padding:10px 14px; font-size:11px; }
 }
+
+.market-watch-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin:18px 0 14px; }
+.market-watch-card { min-width:0; display:flex; flex-direction:column; gap:5px; align-items:flex-start; padding:13px 14px; border:1px solid var(--shell-line); border-radius:11px; background:var(--shell-surface); color:var(--shell-ink); text-align:left; }
+.market-watch-card:hover,.market-watch-card.selected { border-color:#61a07a; box-shadow:0 0 0 2px #61a07a20; }
+.market-watch-card>span { color:var(--shell-muted); font-size:11px; }
+.market-watch-card>b { color:var(--shell-ink); font-size:18px; font-variant-numeric:tabular-nums; }
+.market-watch-card>small { font-size:12px; }
+.market-chart-note { margin:0 0 13px; color:var(--shell-muted); font-size:12px; line-height:1.5; }
+.market-detail-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:1px; overflow:hidden; margin:0 0 15px; border:1px solid var(--shell-line); border-radius:11px; background:var(--shell-line); }
+.market-detail-grid>div { min-width:0; display:flex; flex-direction:column; gap:5px; padding:13px 14px; background:var(--shell-surface); }
+.market-detail-grid span { color:var(--shell-muted); font-size:11px; }
+.market-detail-grid b { overflow:hidden; color:var(--shell-ink); font-size:14px; font-variant-numeric:tabular-nums; text-overflow:ellipsis; white-space:nowrap; }
+.kid-theme .market-chart-note { color:#514377; }
+[data-theme="dark"] .market-watch-card,[data-theme="dark"] .market-detail-grid>div { background:var(--shell-surface); }
+[data-theme="dark"] .market-watch-card>b,[data-theme="dark"] .market-detail-grid b { color:var(--shell-ink); }
+@media(max-width:720px) {
+  .market-watch-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+  .market-detail-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .market-watch-card { padding:11px; }
+  .market-watch-card>b { font-size:16px; }
+}

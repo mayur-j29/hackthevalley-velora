@@ -60,6 +60,8 @@ async function fetchHistory(requestedSymbol, range) {
     if (points.length < 2) throw new Error(`Not enough valid history for ${symbol}.`);
 
     const meta = result.meta || {};
+    const latestQuote = result.indicators?.quote?.[0] || {};
+    const lastValid = values => [...(values || [])].reverse().find(value => Number.isFinite(Number(value))) ?? null;
     return {
       symbol,
       displaySymbol: requestedSymbol === 'S&P 500' || requestedSymbol === 'SPY' ? 'S&P 500 ETF proxy (SPY)' : symbol,
@@ -68,6 +70,13 @@ async function fetchHistory(requestedSymbol, range) {
       interval,
       marketState: meta.marketState || 'UNKNOWN',
       previousClose: Number(meta.chartPreviousClose || meta.previousClose) || null,
+      open: Number(meta.regularMarketOpen) || lastValid(latestQuote.open),
+      dayHigh: Number(meta.regularMarketDayHigh) || lastValid(latestQuote.high),
+      dayLow: Number(meta.regularMarketDayLow) || lastValid(latestQuote.low),
+      volume: Number(meta.regularMarketVolume) || lastValid(latestQuote.volume),
+      yearHigh: Number(meta.fiftyTwoWeekHigh) || null,
+      yearLow: Number(meta.fiftyTwoWeekLow) || null,
+      averageVolume: Number(meta.averageDailyVolume10Day) || null,
       points,
       source: 'Yahoo Finance chart API',
       fetchedAt: new Date().toISOString(),
