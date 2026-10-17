@@ -64,7 +64,7 @@ export default function WhatIfCoach({ persona = 'Adult', cash = 0, income = 0, b
       <form className="what-if-form" onSubmit={askCoach}>
         <label><span>{persona === 'Kid' ? 'WHAT ARE YOU SAVING FOR?' : 'GOAL OR PURCHASE'}</span><input value={goal} onChange={event => setGoal(event.target.value)} maxLength={80} placeholder={persona === 'Kid' ? 'A violin, a bike, art supplies…' : 'A laptop, a course, a trip…'} required/></label>
         <label><span>ESTIMATED COST</span><div className="what-if-input"><b>$</b><input type="number" min="0.01" step="0.01" value={cost} onChange={event => setCost(event.target.value)} placeholder="0.00" required/></div></label>
-        <label><span>{persona === 'Kid' ? 'HOW MUCH COULD YOU SAVE OR EARN EACH MONTH?' : 'OPTIONAL MONTHLY SAVINGS AMOUNT'}</span><div className="what-if-input"><b>$</b><input type="number" min="0" step="1" value={monthlySaving} onChange={event => setMonthlySaving(event.target.value)} placeholder="0"/></div></label>
+        <details className="what-if-optional"><summary>{persona === 'Kid' ? 'Add monthly savings (optional)' : 'Add a monthly savings estimate (optional)'}</summary><label><span>{persona === 'Kid' ? 'HOW MUCH COULD YOU SAVE OR EARN EACH MONTH?' : 'MONTHLY SAVINGS AMOUNT'}</span><div className="what-if-input"><b>$</b><input type="number" min="0" step="1" value={monthlySaving} onChange={event => setMonthlySaving(event.target.value)} placeholder="0"/></div></label></details>
         <button type="submit" className="what-if-submit" disabled={loading}>{loading ? 'Thinking…' : <>Ask the coach <ArrowUpRight size={15}/></>}</button>
         {error && <p className="what-if-error" role="alert">{error}</p>}
       </form>
@@ -72,7 +72,7 @@ export default function WhatIfCoach({ persona = 'Adult', cash = 0, income = 0, b
         <div className="what-if-stats">{statistics.map(stat => <article key={stat.label}><span>{stat.label}</span><b>{stat.value}</b><small>{stat.note}</small></article>)}</div>
         <div className="what-if-timeline"><Wallet size={16}/><span>{monthsToGoal === null ? 'Add a monthly savings amount to see a goal timeline.' : monthsToGoal === 0 ? 'Your current account balance covers this goal.' : `At ${money(monthly)} per month, your goal could take about ${monthsToGoal} month${monthsToGoal === 1 ? '' : 's'}.`}</span></div>
         {coach ? <div className="what-if-coach" aria-live="polite"><div><Sparkles size={15}/><b>{coach.source}</b><span>{persona === 'Kid' ? 'A kind idea' : 'Planning suggestions'}</span></div><p>{coach.text}</p></div> : <div className="what-if-empty"><CircleHelp size={17}/><span>Enter a goal to see its account impact and get personalized suggestions.</span></div>}
-        <small className="what-if-note">Estimates use the details in this browser and are for learning. Coach suggestions do not change your account.</small>
+        <small className="what-if-note">Coach suggestions do not change your account.</small>
       </div>
     </div>
   </section>;
