@@ -224,7 +224,7 @@ function PaperTradeAgent({ plan, asset, cadence, rails, forecast, safeSurplus, r
 function App() {
   const [accountProfile, setAccountProfile] = useState(readActiveAccountProfile);
   const persona = accountProfile?.persona || 'Adult';
-  const [activePage, setActivePage] = useState('Wealth');
+  const [activePage, setActivePage] = useState('Overview');
   const [selectedPalette, setSelectedPalette] = useState(readPalette);
   const [darkMode, setDarkMode] = useState(() => themeOptions.find(option => option.id === readPalette())?.mode === 'dark');
   const [paperAccount, setPaperAccount] = useState(readPaperAccount);
@@ -351,6 +351,7 @@ function App() {
     setPaperAccount(initialPaperAccount);
     window.localStorage.removeItem('velora-onboarding-choice');
     setAccountProfile(profile);
+    setActivePage('Overview');
     setPurchase(0);
     setPurchaseInput('');
     setCancelled([]);
@@ -380,6 +381,7 @@ function App() {
     savePaperAccount(initialPaperAccount);
     setPaperAccount(initialPaperAccount);
     setAccountProfile(null);
+    setActivePage('Overview');
     setPurchase(0);
     setPurchaseInput('');
     setCancelled([]);
@@ -512,27 +514,33 @@ function App() {
   const activePageLabel = pages.find(item => item.page === activePage)?.label || activePage;
   const savedAccount = readAccountProfile();
 
+  if (!accountProfile) {
+    return savedAccount
+      ? <LocalLogin profile={savedAccount} palette={selectedPalette} onPaletteChange={applyPalette} onLogin={logIn}/>
+      : <AccountSetup onCreate={createAccount} palette={selectedPalette} onPaletteChange={applyPalette}/>;
+  }
+
   return <div className={`app-shell ${persona === 'Kid' ? 'kid-theme' : 'professional-theme'}`} data-theme={darkMode ? 'dark' : 'light'} data-palette={themeOptions.find(option => option.id === selectedPalette)?.palette || 'green'}>
     <aside className="sidebar">
       <a className="brand sidebar-brand" href="#top" aria-label="Velora overview"><span className="brand-mark"><span/><span/><span/></span><span>velora</span></a>
       <div className="sidebar-section-label">WORKSPACE</div>
       <nav className="sidebar-nav" aria-label="Main navigation">{pages.map(({ label, page, icon: Icon }) => <button key={page} className={activePage === page ? 'sidebar-link active' : 'sidebar-link'} onClick={() => setActivePage(page)} aria-current={activePage === page ? 'page' : undefined}><Icon size={18}/><span>{persona === 'Kid' && label === 'Portfolio' ? 'My stocks' : label}</span></button>)}</nav>
       {persona === 'Kid' && <div className="kid-glossary"><b>Money words</b><p><strong>Stock</strong> · a tiny piece of a company.</p><p><strong>Price</strong> · what one piece costs right now.</p><p><strong>Paper money</strong> · pretend dollars for practice.</p><p><strong>Risk</strong> · the chance your pretend money goes down.</p></div>}
-      <div className="sidebar-bottom"><button className="theme-toggle" onClick={toggleColorMode}><span className="theme-toggle-icon">{darkMode ? <Sun size={16}/> : <Moon size={16}/>}</span>{darkMode ? 'Light mode' : 'Dark mode'}</button><div className="sidebar-profile"><span className="locked-account-avatar">{activePage === 'Wealth' ? 'V' : (accountProfile?.firstName || persona).slice(0, 1).toUpperCase()}</span><span><b>{activePage === 'Wealth' ? 'Demo personas' : accountProfile?.firstName || `${persona} account`}</b><small>{activePage === 'Wealth' ? 'Aisha · Marcus · Elena' : `${persona} account`}</small></span></div></div>
+      <div className="sidebar-bottom"><button className="theme-toggle" onClick={toggleColorMode}><span className="theme-toggle-icon">{darkMode ? <Sun size={16}/> : <Moon size={16}/>}</span>{darkMode ? 'Light mode' : 'Dark mode'}</button><div className="sidebar-profile"><span className="locked-account-avatar">{(accountProfile?.firstName || persona).slice(0, 1).toUpperCase()}</span><span><b>{accountProfile?.firstName || `${persona} account`}</b><small>{persona} account</small></span></div></div>
     </aside>
     <div className="workspace">
     <header className="topbar">
-      <div className="top-actions"><span className="status"><i/> {activePage === 'Wealth' ? 'Simulated market ready' : linkedAccount ? 'Plaid Sandbox linked' : 'Demo bank ready'}</span><span className="engine"><Sparkles size={13}/> {activePage === 'Wealth' ? 'AI simulation' : `AI ${aiStatus === 'live' ? 'connected' : aiStatus === 'demo' ? 'rules fallback' : 'ready'}`}</span>{activePage !== 'Wealth' && persona !== 'Kid' && (accountProfile || savedAccount) && <button className="session-button" onClick={accountProfile ? logOut : logIn}>{accountProfile ? 'Log out' : 'Log in'}</button>}{activePage !== 'Wealth' && <button className="new-account-button" onClick={createNewAccount}>New account</button>}<button className="icon-btn" aria-label="Notifications"><Bell size={18}/></button><button className="avatar" aria-label="Account profile">{activePage === 'Wealth' ? 'V' : (accountProfile?.firstName || persona).slice(0, 1).toUpperCase()}</button></div>
+      <div className="top-actions"><span className="status"><i/> {activePage === 'Wealth' ? 'Simulated market ready' : linkedAccount ? 'Plaid Sandbox linked' : 'Practice account ready'}</span><span className="engine"><Sparkles size={13}/> {activePage === 'Wealth' ? 'AI simulation' : `AI ${aiStatus === 'live' ? 'connected' : aiStatus === 'demo' ? 'rules fallback' : 'ready'}`}</span>{activePage !== 'Wealth' && persona !== 'Kid' && (accountProfile || savedAccount) && <button className="session-button" onClick={accountProfile ? logOut : logIn}>{accountProfile ? 'Log out' : 'Log in'}</button>}<button className="new-account-button" onClick={createNewAccount}>New account</button><button className="icon-btn" aria-label="Notifications"><Bell size={18}/></button><button className="avatar" aria-label="Account profile">{(accountProfile?.firstName || persona).slice(0, 1).toUpperCase()}</button></div>
     </header>
     <main id="top" className="dashboard">
-      <div className="page-title-row" style={{ display: activePage === 'Wealth' ? 'none' : undefined }}><div><div className="eyebrow">{activePage === 'Trading' ? 'YOUR AI MONEY ASSISTANT' : activePageLabel.toUpperCase()}</div><h1>{activePage === 'Overview' ? (accountProfile?.firstName ? `Welcome, ${accountProfile.firstName}` : displayName) : activePage === 'Trading' ? 'AI ideas, with your say' : activePageLabel}</h1><p>{activePage === 'Overview' ? personaCopy : activePage === 'Trading' ? 'A sample account is ready. Choose an amount and comfort level. AI explains each idea; you approve every practice order.' : activePage === 'WhatIf' ? 'Explore how a goal or purchase could affect your account, then get age-appropriate ideas from your coach.' : activePage === 'Portfolio' ? 'Your practice cash, stocks, and recent decisions.' : activePage === 'Markets' ? 'Explore live prices and company details.' : activePage === 'Planning' ? 'Plan upcoming money in and money out.' : activePage === 'Tools' ? 'Explore guarded tools for your practice account.' : activePage}</p></div><span className="page-persona-tag">{linkedAccount ? 'Plaid Sandbox' : 'Demo account'} · {persona}</span></div>
+      <div className="page-title-row" style={{ display: activePage === 'Wealth' ? 'none' : undefined }}><div><div className="eyebrow">{activePage === 'Trading' ? 'YOUR AI MONEY ASSISTANT' : activePageLabel.toUpperCase()}</div><h1>{activePage === 'Overview' ? (accountProfile?.firstName ? `Welcome, ${accountProfile.firstName}` : displayName) : activePage === 'Trading' ? 'AI ideas, with your say' : activePageLabel}</h1><p>{activePage === 'Overview' ? personaCopy : activePage === 'Trading' ? 'A sample account is ready. Choose an amount and comfort level. AI explains each idea; you approve every practice order.' : activePage === 'WhatIf' ? 'Explore how a goal or purchase could affect your account, then get age-appropriate ideas from your coach.' : activePage === 'Portfolio' ? 'Your practice cash, stocks, and recent decisions.' : activePage === 'Markets' ? 'Explore simulated prices and company details.' : activePage === 'Planning' ? 'Plan upcoming money in and money out.' : activePage === 'Tools' ? 'Explore guarded tools for your practice account.' : activePage}</p></div><span className="page-persona-tag">{linkedAccount ? 'Plaid Sandbox' : 'Practice account'} · {persona}</span></div>
       <div className="page-content">
-      {activePage === 'Wealth' && <WealthManager/>}
+      {activePage === 'Wealth' && <WealthManager userAccount={accountProfile}/>}
       <div style={{ display: activePage === 'Trading' ? 'block' : 'none' }} aria-hidden={activePage !== 'Trading'}><TradingDesk key={accountProfile?.id || 'no-account'} autoStart={Boolean(accountProfile)} onAiStatus={setAiStatus}/></div>
       {activePage === 'WhatIf' && <WhatIfCoach persona={persona} cash={whatIfCash - purchase} income={income} bills={bills} safeSurplus={safeSurplus} projectedLow={lowestBalance} reserve={reserve}/>}
       {activePage === 'Overview' && <>
       <section className="summary-grid" aria-label={`${persona} account overview`}>
-        <article className="summary-card balance-card"><div className="card-topline"><span>{persona === 'Kid' ? 'Pretend cash' : linkedAccount ? 'Sandbox bank balance' : 'Demo bank cash'}</span><CircleHelp size={15}/></div><div className="balance-amount">{money(accountBalance-purchase,2)}</div><div className="balance-foot"><span className="up-label"><TrendingUp size={14}/> {linkedAccount ? 'Plaid Sandbox' : 'Velora Demo Bank'}</span><span>{linkedAccount ? `${linkedAccount.currency} · •••• ${linkedAccount.mask}` : `CAD · •••• ${DEMO_BANK.mask}`}</span></div><div className="balance-spark"><svg viewBox="0 0 140 42"><path d="M1 32 C18 26 18 33 33 25 S55 28 65 17 S84 23 98 12 S116 19 139 3" fill="none" stroke="#70b69a" strokeWidth="2"/></svg></div></article>
+        <article className="summary-card balance-card"><div className="card-topline"><span>{persona === 'Kid' ? 'Pretend cash' : linkedAccount ? 'Sandbox bank balance' : 'Practice cash'}</span><CircleHelp size={15}/></div><div className="balance-amount">{money(accountBalance-purchase,2)}</div><div className="balance-foot"><span className="up-label"><TrendingUp size={14}/> {linkedAccount ? 'Plaid Sandbox' : 'Velora practice account'}</span><span>{linkedAccount ? `${linkedAccount.currency} · •••• ${linkedAccount.mask}` : `CAD · •••• ${DEMO_BANK.mask}`}</span></div><div className="balance-spark"><svg viewBox="0 0 140 42"><path d="M1 32 C18 26 18 33 33 25 S55 28 65 17 S84 23 98 12 S116 19 139 3" fill="none" stroke="#70b69a" strokeWidth="2"/></svg></div></article>
         <article className="summary-card"><div className="card-topline"><span>{persona === 'Kid' ? 'Money coming in' : accountProfile?.demo ? 'Sample work · 30 days' : 'Income · 30 days'}</span><span className="metric-icon income-icon"><ArrowDownLeft size={17}/></span></div><div className="metric-amount">{money(income,0)}</div><div className="metric-foot"><span className="metric-note"><i className="small-green-dot"/> {persona === 'Kid' ? 'Planned paydays' : accountProfile?.demo ? '$500 added each day' : 'Income included'}</span></div></article>
         <article className="summary-card"><div className="card-topline"><span>{persona === 'Kid' ? 'Bills to pay' : 'Planned outflows'}</span><span className="metric-icon bill-icon"><ArrowUpRight size={17}/></span></div><div className="metric-amount">{money(bills,0)}</div><div className="metric-foot"><span className="metric-note">{persona === 'Kid' ? 'Planned bills' : 'Scheduled bills included'}</span></div></article>
         <article className="summary-card"><div className="card-topline"><span>{persona === 'Kid' ? 'Left after bills' : 'Safe to explore'}</span><span className="metric-icon safe-icon"><ShieldCheck size={17}/></span></div><div className="metric-amount">{money(safeSurplus,0)}</div><div className="metric-foot"><span className="metric-note">{persona === 'Kid' ? 'Keepsake money protected' : `After a ${money(reserve)} cash buffer`}</span></div></article>
@@ -555,11 +563,10 @@ function App() {
       <section className="panel subscriptions-panel"><div className="section-title"><div className="section-icon coral-icon"><CreditCard size={18}/></div><div><div className="eyebrow">RECURRING EXPENSES</div><h2>Your recurring charges.</h2></div></div>{recurringTotal > 0 ? <><div className="subscription-total"><span>Monthly total</span><b>{money(recurringTotal,2)}<small>/mo</small></b></div><div className="subscription-list">{subscriptions.map(item => {const isCancelled=cancelled.includes(item.name);return <div className={isCancelled?'subscription canceled':'subscription'} key={item.name}><div className="service-icon" style={{'--service':item.color}}>{item.icon}</div><div className="service-name"><b>{item.name}</b><small>{isCancelled?'Cancellation simulated':item.detail}</small></div><div className="service-cost">{money(item.amount,2)}<small>/mo</small></div><button className={isCancelled?'toggle on':'toggle'} onClick={() => setCancelled(isCancelled ? cancelled.filter(name => name !== item.name) : [...cancelled, item.name])} aria-label={`${isCancelled?'Restore':'Simulate cancellation'} ${item.name}`}><i/></button></div>})}</div></> : <div className="subscriptions-empty"><CreditCard size={18}/><span><b>No recurring charges added</b><small>Your account is empty by design. Add expected bills to the payment calendar when you’re ready.</small></span></div>}<div className="nudge"><div className="nudge-spark"><Sparkles size={15}/></div><div><span className="nudge-label">PLAN INSIGHT</span><p>{recurringTotal ? 'Recurring charges are planning examples; changing a toggle never modifies a service account.' : 'Once you add recurring items, the forecast and cash-reserve checks will update automatically.'}</p></div></div></section>
       </div>}
       </div>
-      <footer className="page-footer"><span><LockKeyhole size={13}/> {activePage === 'Wealth' ? 'Three saved simulated accounts' : `Demo bank · sample balance ${money(paperAccount.bankCash)}`}</span><span>Practice orders only · no real funds move</span><span className="footer-right">Built for clearer decisions</span></footer>
+      <footer className="page-footer"><span><LockKeyhole size={13}/> {activePage === 'Wealth' ? 'Simulated portfolio · saved in this browser' : `Demo bank · sample balance ${money(paperAccount.bankCash)}`}</span><span>Practice orders only · no real funds move</span><span className="footer-right">Built for clearer decisions</span></footer>
     </main>
     <div className="disclaimer"><span><ShieldCheck size={15}/> <b>Paper investing only.</b> This educational simulation cannot place real trades, move money, or provide formal financial advice.</span></div>
     </div>
-    {!accountProfile && (savedAccount ? <LocalLogin profile={savedAccount} palette={selectedPalette} onPaletteChange={applyPalette} onLogin={logIn}/> : <AccountSetup onCreate={createAccount} palette={selectedPalette} onPaletteChange={applyPalette}/>)}
   </div>;
 }
 

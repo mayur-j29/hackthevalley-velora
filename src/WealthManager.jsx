@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Activity, ArrowDownRight, ArrowUpRight, Bot, CalendarDays, ChevronDown, CircleDollarSign, RotateCcw, ShieldCheck, Sparkles, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
+import { Activity, ArrowDownRight, ArrowUpRight, Bot, CalendarDays, CircleDollarSign, RotateCcw, ShieldCheck, Sparkles, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
 import { ASSETS, PERSONAS, REGIMES, buildBenchmarkSeries, createSimulation, loadSimulation, saveSimulation } from './simulation.ts';
 import { checkAgentAction, dailyDrawdown, DAILY_DRAWDOWN_LIMIT, generateFallbackActions, targetWeights } from './wealth-agent.js';
 import { supabase, supabaseConfigured } from './supabase.js';
@@ -7,7 +7,7 @@ import './wealth-manager.css';
 
 const money = value => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value);
 const precise = value => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format(value);
-function localChatAnswer(question, persona, portfolio, decisions, date) {
+function localChatAnswer(question, persona, portfolio, decisions, date, userAccount) {
   const sale = question.match(/\b(?:sell|selling|sold)\s+(?:of\s+)?([A-Z]{1,5})\b/i);
   if (sale) {
     const ticker = sale[1].toUpperCase();
@@ -15,7 +15,7 @@ function localChatAnswer(question, persona, portfolio, decisions, date) {
     if (entry?.status === 'executed') return `Velora’s log shows a simulated ${ticker} sale on ${entry.simDate}: ${entry.reason} No real shares were sold.`;
     return `I don’t see a recorded ${ticker} sale in Velora’s decision log, so I can’t give a reason for one.`;
   }
-  if (/goal|track|progress|on track/i.test(question)) return `${persona.name}’s demo goal is “${persona.goal}” with a ${persona.horizonYears}-year horizon. Current simulated net worth is ${money(portfolio.netWorth)}; the profile has no target amount or dated milestone to measure progress against.`;
+  if (/goal|track|progress|on track/i.test(question)) return `${userAccount?.firstName || userAccount?.name || 'Your'} simulated net worth is ${money(portfolio.netWorth)}. The profile has no target amount or dated milestone to measure progress against.`;
   return `As of ${date}, simulated net worth is ${money(portfolio.netWorth)} with ${money(portfolio.cash)} cash and ${portfolio.holdings.length} holdings. I can only confirm trades that appear in the saved decision log.`;
 }
 
@@ -47,7 +47,7 @@ function BenchmarkChart({ rows }) {
   return <div className="wm-benchmark-chart"><svg viewBox="0 0 900 145" role="img" aria-label="Velora managed portfolio compared with SPY and cash"><polyline points={points('managed')} fill="none" stroke="#8fc99b" strokeWidth="2.7" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke"/><polyline points={points('spy')} fill="none" stroke="#d2b379" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke"/><polyline points={points('cash')} fill="none" stroke="#84958b" strokeWidth="1.6" strokeDasharray="5 6" vectorEffect="non-scaling-stroke"/></svg><div className="wm-benchmark-dates"><span>{rows[0].date}</span><span>{rows.at(-1).date}</span></div><div className="wm-benchmark-legend"><span><i className="managed"/> Velora managed</span><span><i className="spy"/> Buy-and-hold SPY</span><span><i className="cash"/> Cash</span></div></div>;
 }
 
-export default function WealthManager() {
+export default function WealthManager({ userAccount }) {
   const [simulation, setSimulation] = useState(() => loadSimulation());
   const [session, setSession] = useState(null);
   const [authStatus, setAuthStatus] = useState(supabaseConfigured ? 'loading' : 'local');
@@ -252,7 +252,7 @@ export default function WealthManager() {
     setSimulation(fresh);
     persistSimulation(fresh);
     setHistoryVersion(value => value + 1);
-    setMessage('All three demo accounts and the market have been reset.');
+    setMessage('Your simulation and the market have been reset.');
     setChatMessages([]);
   }
 
@@ -414,7 +414,7 @@ export default function WealthManager() {
         source = payload.source || 'ai';
       } finally { window.clearTimeout(timer); }
     } catch {
-      answer = localChatAnswer(prompt, { ...persona, ...(userProfile || {}) }, currentPortfolio, currentDecisions, simulation.getDate());
+      answer = localChatAnswer(prompt, { ...persona, ...(userProfile || {}) }, currentPortfolio, currentDecisions, simulation.getDate(), userAccount);
       source = 'fallback';
     }
     setChatFallback(source === 'fallback');
@@ -467,7 +467,7 @@ export default function WealthManager() {
       <div className="wm-header-right">{supabaseConfigured ? <><span className="wm-sync-badge"><i className={syncError ? 'error' : ''}/>{syncError ? 'SYNC ISSUE' : 'CLOUD SYNC'}</span><button className="wm-signout-button" onClick={signOut}>Sign out</button></> : <span className="wm-sync-badge local"><i/> SAVED ON THIS DEVICE</span>}<div className="wm-market-status"><span className="wm-status-dot"/> SIM MARKET <span className="wm-status-divider"/> {prices.date}</div></div>
     </header>
 
-    <section className="wm-welcome-row"><div><div className="wm-eyebrow">YOUR SIMULATED WEALTH PLAN</div><h1>Good day, {userProfile?.name || persona.name}.</h1><p>{userProfile ? `Your ${persona.name} simulated portfolio is personalized for a ${userProfile.risk} risk profile.` : 'Your portfolio, market and AI activity in one calm view.'}</p></div><label className="wm-persona-picker"><span>SIMULATED PORTFOLIO</span><div><select value={accountId} onChange={event => setPersona(event.target.value)} aria-label="Select a demo account">{PERSONAS.map(person => <option key={person.id} value={person.id}>{person.name}, {person.age} · {person.risk}</option>)}</select><ChevronDown size={15}/></div></label></section>
+    <section className="wm-welcome-row"><div><div className="wm-eyebrow">YOUR SIMULATED WEALTH PLAN</div><h1>Good day, {userProfile?.name || userAccount?.firstName || persona.name}.</h1><p>{userProfile ? `Your portfolio is personalized for a ${userProfile.risk} risk profile.` : 'Your portfolio, market and AI activity in one calm view.'}</p></div><div className="wm-account-label"><span>YOUR ACCOUNT</span><b>{userAccount?.persona || 'Personal'} practice portfolio</b><small>Simulated environment</small></div></section>
 
     <section className="wm-metrics" aria-label="Portfolio summary">
       <article className="wm-metric wm-net-worth"><div className="wm-metric-label">NET WORTH <CircleDollarSign size={16}/></div><strong>{money(portfolio.netWorth)}</strong><span>USD · simulated account</span><div className="wm-metric-spark"><Activity size={16}/><span>{pnl >= 0 ? '+' : ''}{money(pnl)} since start</span></div></article>
