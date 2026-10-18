@@ -97,7 +97,7 @@
 .wm-crash-button{font-size:10px;padding:9px 11px}
 .wm-footer{font-size:10px;line-height:1.5;padding-top:16px}
 .wm-sync-badge,.wm-signout-button{font-size:9px}
-.wealth-manager button,.wealth-manager input,.wealth-manager select{font:inherit}
+.wealth-manager button,.wealth-manager input,.wealth-manager select{font-family:inherit}
 .wealth-manager button{cursor:pointer}
 .wealth-manager button:focus-visible,.wealth-manager input:focus-visible,.wealth-manager select:focus-visible,.wealth-manager input[type=range]:focus-visible{outline:2px solid #96c9a1;outline-offset:3px}
 @media(max-width:1050px){
