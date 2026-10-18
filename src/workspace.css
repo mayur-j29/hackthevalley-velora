@@ -599,4 +599,6 @@
 .professional-theme .copilot-chat-bubble>small,.professional-theme .copilot-new-chat { color:var(--palette-muted) !important; }
 .professional-theme .copilot-new-chat { border-color:var(--shell-line) !important; background:var(--palette-surface); }
 .professional-theme .copilot-chat-bubble.typing p i { background:var(--palette-accent); }
+.app-shell.professional-theme[data-theme="light"] .wealth-manager .wm-allocation-legend b { color:#172435 !important; -webkit-text-fill-color:#172435; }
+.app-shell.professional-theme[data-theme="light"] .wealth-manager .wm-allocation-legend span { color:#526174 !important; }
 .professional-theme .setup-continue,.professional-theme .theme-toggle,.professional-theme .page-persona-tag { box-shadow:none; }
