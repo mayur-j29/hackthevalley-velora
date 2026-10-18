@@ -12,3 +12,131 @@
 .wm-header-right{display:flex;align-items:center;gap:12px}.wm-sync-badge{display:inline-flex;align-items:center;gap:6px;padding:5px 8px;border:1px solid #355641;border-radius:20px;color:#a7d2af;font-size:7px;font-weight:700;letter-spacing:.45px;white-space:nowrap}.wm-sync-badge i{width:6px;height:6px;border-radius:50%;background:#83c992}.wm-sync-badge i.error{background:#e29484}.wm-sync-badge.local{color:#b3c1b7;border-color:#425047}.wm-sync-badge.local i{background:#c9b477}.wm-signout-button{border:1px solid var(--wm-border);border-radius:7px;padding:6px 9px;background:#19261e;color:#d3e1d6;font-size:8px}.wm-auth-card,.wm-auth-state{max-width:540px;margin:34px auto;padding:30px;background:#17231d;border:1px solid #2b3c32;border-radius:16px;color:#edf3ed;box-shadow:0 18px 42px #0a140f24}.wm-auth-card .wm-brand-lockup{margin-bottom:28px}.wm-auth-card>.wm-eyebrow{display:block;margin-bottom:8px}.wm-auth-card h1{font:600 25px Manrope,sans-serif;letter-spacing:-.5px;margin:0 0 8px}.wm-auth-card>p{font-size:12px;line-height:1.6;color:#aab8ae;margin:0 0 20px}.wm-auth-card>small{display:block;margin-top:18px;color:#84948a;font-size:9px;line-height:1.5}.wm-auth-form{display:grid;gap:12px}.wm-auth-form label{display:grid;gap:6px;color:#cbd8ce;font-size:10px;font-weight:600}.wm-auth-form input,.wm-auth-form select{width:100%;padding:11px 12px;border:1px solid #35483b;border-radius:8px;background:#101a15;color:#eaf1eb;outline:none;font:400 11px Manrope,sans-serif}.wm-auth-form input:focus,.wm-auth-form select:focus{border-color:#79a980}.wm-auth-form .wm-primary-button{display:flex;justify-content:center;margin-top:4px;padding:11px;border:1px solid #45694b;border-radius:8px;background:#275039;color:#eff8ef;font-size:10px;font-weight:650}.wm-auth-form .wm-primary-button:disabled{opacity:.6}.wm-auth-switch{display:block;margin:14px auto 0;border:0;background:transparent;color:#a8d2af;text-decoration:underline;text-underline-offset:3px;font-size:10px;cursor:pointer}.wm-auth-error,.wm-auth-message{padding:10px 11px;border-radius:8px;font-size:10px;line-height:1.5}.wm-auth-error{margin-top:12px;background:#412c28;color:#f0b6a8}.wm-auth-message{margin-top:12px;background:#203a2b;color:#b4ddb9}.wm-profile-fields{display:grid;grid-template-columns:110px 1fr;gap:10px}.wm-profile-form{gap:11px}.wm-auth-state{display:flex;align-items:center;justify-content:center;gap:10px;min-height:160px;color:#b9c9bd}.wm-auth-state p{font-size:11px}.wm-profile-card .wm-auth-form{margin-top:18px}
 @media(max-width:560px){.wm-header-right{align-items:flex-end;flex-direction:column;gap:6px}.wm-auth-card{margin:16px auto;padding:22px 18px}.wm-profile-fields{grid-template-columns:1fr}.wm-welcome-row{align-items:flex-start;flex-direction:column}}
 .wm-account-label{display:grid;min-width:168px;gap:4px;padding:10px 13px;border:1px solid var(--wm-border);border-radius:10px;background:#ffffff08}.wm-account-label>span{color:#819188;font-size:8px;font-weight:800;letter-spacing:.7px}.wm-account-label>b{color:var(--wm-text);font-size:10px;text-transform:capitalize}.wm-account-label>small{color:#829188;font-size:8px}
+
+
+/* Wealth Manager readability and responsive polish */
+.wealth-manager{padding:clamp(18px,2.4vw,32px);border-radius:20px;line-height:1.5;background:#101b16}
+.wm-header{padding-bottom:20px}
+.wm-header-right{gap:10px;flex-wrap:wrap;justify-content:flex-end}
+.wm-brand-lockup>div b{font-size:20px}
+.wm-brand-lockup>div small,.wm-eyebrow{font-size:10px;letter-spacing:1.15px}
+.wm-market-status{font-size:11px}
+.wm-welcome-row{padding:28px 0;align-items:center}
+.wm-welcome-row h1{font-size:clamp(27px,3vw,36px);line-height:1.15}
+.wm-welcome-row p{font-size:14px;line-height:1.55}
+.wm-account-label{min-width:200px;padding:13px 15px}
+.wm-account-label>span{font-size:10px}
+.wm-account-label>b{font-size:13px}
+.wm-account-label>small{font-size:11px}
+.wm-metrics{gap:14px}
+.wm-metric{min-height:126px;padding:18px;border-radius:15px}
+.wm-metric-label{font-size:10px;letter-spacing:.65px}
+.wm-metric>strong{font-size:clamp(22px,2vw,30px);margin:12px 0 3px}
+.wm-metric>span{font-size:12px;line-height:1.4}
+.wm-metric-spark{font-size:11px;margin-top:9px}
+.wm-controls{margin:16px 0;padding:15px 17px}
+.wm-control-date small{font-size:9px}
+.wm-control-date b{font-size:12px}
+.wm-control-buttons{gap:9px}
+.wm-control-buttons button{padding:10px 13px;font-size:11px}
+.wm-panel{padding:21px;border-radius:15px}
+.wm-main-grid,.wm-bottom-grid{gap:15px}
+.wm-panel-heading h2{font-size:18px}
+.wm-period-tabs button{font-size:10px;padding:6px 9px}
+.wm-chart-total{font-size:24px}
+.wm-chart-total span{font-size:12px}
+.wm-line-chart{height:165px}
+.wm-chart-labels,.wm-timeline{font-size:10px}
+.wm-allocation-body{gap:22px}
+.wm-donut{width:150px;height:150px}
+.wm-donut:before{inset:18px}
+.wm-donut b{font-size:25px}
+.wm-donut small{font-size:10px}
+.wm-allocation-legend{gap:11px}
+.wm-allocation-legend>div{grid-template-columns:9px minmax(45px,1fr) auto;gap:9px;font-size:11px}
+.wm-allocation-legend i{width:8px;height:8px}
+.wm-allocation-legend b{font-size:11px}
+.wm-holdings-note{font-size:10px}
+.wm-holdings-panel table{min-width:620px;margin-top:16px}
+.wm-holdings-panel th{font-size:9px;padding:10px}
+.wm-holdings-panel td{font-size:12px;padding:13px 10px}
+.wm-ticker{font-size:13px}
+.wm-asset-name{font-size:10px}
+.wm-empty-holdings b{font-size:12px}
+.wm-empty-holdings small{font-size:10px}
+.wm-market-panel>p,.wm-benchmark-copy{font-size:12px;line-height:1.55}
+.wm-market-quotes{gap:9px}
+.wm-market-quotes>div{padding:11px}
+.wm-market-quotes span{font-size:11px}
+.wm-market-quotes small{font-size:10px}
+.wm-market-quotes b{font-size:12px}
+.wm-event{padding:12px 0}
+.wm-event b{font-size:12px}
+.wm-event small{font-size:10px}
+.wm-no-events{font-size:12px;line-height:1.5}
+.wm-agent-controls{gap:15px;padding:15px 17px;border-radius:13px}
+.wm-mode-control>span{font-size:9px}
+.wm-mode-control button{font-size:11px;padding:8px 12px}
+.wm-agent-explainer{font-size:12px}
+.wm-run-agent{font-size:12px;padding:10px 15px}
+.wm-circuit-breaker,.wm-cycle-progress{font-size:11px}
+.wm-source-badge,.wm-status-badge,.wm-risk-badge{font-size:9px}
+.wm-decision{gap:12px;padding:16px 0}
+.wm-decision-title>b{font-size:12px}
+.wm-decision-copy p{font-size:12px;line-height:1.5}
+.wm-decision-copy small{font-size:10px;line-height:1.5}
+.wm-decision-actions button{font-size:10px;padding:7px 11px}
+.wm-benchmark-difference>b{font-size:24px}
+.wm-benchmark-difference>small,.wm-benchmark-dates,.wm-benchmark-legend{font-size:10px}
+.wm-chat-history{min-height:190px}
+.wm-chat-empty,.wm-chat-message p,.wm-chat-loading{font-size:12px;line-height:1.55}
+.wm-chat-form input{font-size:12px;min-height:44px}
+.wm-chat-form button{font-size:11px}
+.wm-chat-prompts button,.wm-chat-disclaimer{font-size:10px}
+.wm-market-panel .wm-panel-heading select{font-size:11px;padding:9px 30px 9px 11px}
+.wm-crash-button{font-size:10px;padding:9px 11px}
+.wm-footer{font-size:10px;line-height:1.5;padding-top:16px}
+.wm-sync-badge,.wm-signout-button{font-size:9px}
+.wealth-manager button,.wealth-manager input,.wealth-manager select{font:inherit}
+.wealth-manager button{cursor:pointer}
+.wealth-manager button:focus-visible,.wealth-manager input:focus-visible,.wealth-manager select:focus-visible,.wealth-manager input[type=range]:focus-visible{outline:2px solid #96c9a1;outline-offset:3px}
+@media(max-width:1050px){
+  .wm-metrics{gap:10px}
+  .wm-metric{padding:15px}
+  .wm-main-grid{grid-template-columns:minmax(0,1.25fr) minmax(250px,.85fr)}
+}
+@media(max-width:760px){
+  .wealth-manager{padding:18px}
+  .wm-header{align-items:flex-start}
+  .wm-header-right{align-items:flex-end}
+  .wm-welcome-row{gap:16px;padding:23px 0}
+  .wm-account-label{width:100%}
+  .wm-main-grid,.wm-bottom-grid{grid-template-columns:minmax(0,1fr)}
+  .wm-panel{padding:18px}
+  .wm-controls{gap:12px}
+  .wm-control-buttons{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+  .wm-control-buttons .wm-primary-button{grid-column:span 2}
+  .wm-allocation-body{flex-wrap:wrap}
+  .wm-allocation-legend{min-width:180px}
+}
+@media(max-width:480px){
+  .wealth-manager{padding:14px;border-radius:15px}
+  .wm-header{flex-direction:column}
+  .wm-header-right{width:100%;align-items:flex-start;justify-content:flex-start}
+  .wm-welcome-row h1{font-size:25px}
+  .wm-metrics{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .wm-metric{min-height:112px;padding:12px}
+  .wm-metric>strong{font-size:19px}
+  .wm-metric-label{font-size:9px}
+  .wm-metric>span{font-size:10px}
+  .wm-controls{padding:13px}
+  .wm-control-buttons{gap:7px}
+  .wm-control-buttons button{font-size:10px;padding:9px 7px}
+  .wm-panel{padding:14px}
+  .wm-panel-heading{align-items:flex-start}
+  .wm-allocation-body{justify-content:center}
+  .wm-allocation-legend{width:100%;flex-basis:100%}
+  .wm-period-tabs{flex-wrap:wrap}
+  .wm-chat-prompts{flex-wrap:wrap}
+  .wm-footer{gap:8px}
+}
