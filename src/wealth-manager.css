@@ -140,3 +140,28 @@
   .wm-chat-prompts{flex-wrap:wrap}
   .wm-footer{gap:8px}
 }
+
+/* Linked account summary: contain each figure in a readable card */
+.wm-account-label{background:#1b2b23!important;border-color:#35523d!important}
+.wm-account-label>span{color:#a8c3b1!important}
+.wm-account-label>b{color:#edf3ed!important}
+.wm-account-label>small{color:#b6c5ba!important}
+.wm-linked-account{margin:0 0 16px;padding:18px 20px;background:var(--wm-surface);border:1px solid var(--wm-border);border-radius:15px}
+.wm-linked-account-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:14px}
+.wm-linked-account-heading h2{margin:5px 0 0;font:600 18px Manrope,sans-serif;color:var(--wm-text)}
+.wm-linked-account-heading>small{color:var(--wm-muted);font-size:11px;text-align:right}
+.wm-linked-account-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.wm-linked-account-metrics article{display:flex;flex-direction:column;gap:5px;min-width:0;padding:14px;background:#111c16;border:1px solid #2a3c31;border-radius:11px}
+.wm-linked-account-metrics article>span{color:#aab9ae;font-size:10px}
+.wm-linked-account-metrics article>b{color:#edf3ed;font:600 20px Manrope,sans-serif}
+.wm-linked-account-metrics article>small{color:#91a198;font-size:10px;line-height:1.45}
+@media(max-width:760px){
+  .wm-linked-account-heading{align-items:flex-start;flex-direction:column}
+  .wm-linked-account-heading>small{text-align:left}
+  .wm-linked-account-metrics{grid-template-columns:1fr}
+}
+@media(max-width:480px){
+  .wm-linked-account{padding:14px}
+  .wm-linked-account-metrics article{padding:12px}
+  .wm-linked-account-metrics article>b{font-size:18px}
+}
