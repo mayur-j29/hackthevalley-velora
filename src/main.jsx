@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Activity, ArrowDownLeft, ArrowUpRight, Bell, BookOpenCheck, CalendarDays, Check, ChevronDown, CircleDollarSign, CircleHelp, Clock3, CreditCard, Landmark, LockKeyhole, ShieldCheck, Sparkles, TrendingDown, TrendingUp, Wallet, Wrench, X, LayoutDashboard, BriefcaseBusiness, Sun, Moon } from 'lucide-react';
+import { Activity, ArrowDownLeft, ArrowUpRight, Bell, BookOpenCheck, CalendarDays, Camera, Check, ChevronDown, CircleDollarSign, CircleHelp, Clock3, CreditCard, Landmark, LockKeyhole, LogOut, ShieldCheck, Sparkles, TrendingDown, TrendingUp, Wallet, Wrench, X, LayoutDashboard, BriefcaseBusiness, Sun, Moon } from 'lucide-react';
 import { buildForecast, crashScenarios, evaluateSimulatedTrade, getSafeSurplus, simulateAutoInvest } from './finance';
 import MarketReplay from './MarketReplay';
 import PaperPortfolio from './PaperPortfolio';
@@ -234,6 +234,11 @@ function App() {
   const [activePage, setActivePage] = useState('Overview');
   const [selectedPalette, setSelectedPalette] = useState(readPalette);
   const [darkMode, setDarkMode] = useState(() => themeOptions.find(option => option.id === readPalette())?.mode === 'dark');
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [profilePhoto, setProfilePhoto] = useState('');
+  const [profilePhotoMessage, setProfilePhotoMessage] = useState('');
+  const profileMenuRef = useRef(null);
+  const profilePhotoInputRef = useRef(null);
   const [paperAccount, setPaperAccount] = useState(readPaperAccount);
   const [purchase, setPurchase] = useState(0);
   const [purchaseInput, setPurchaseInput] = useState('');
@@ -265,6 +270,26 @@ function App() {
   const [plaidBusy, setPlaidBusy] = useState(false);
   const [plaidMessage, setPlaidMessage] = useState('');
   const [sandboxTransfers, setSandboxTransfers] = useState([]);
+  const profilePhotoKey = `velora-profile-photo-${accountProfile?.id || 'local'}`;
+  useEffect(() => {
+    try { setProfilePhoto(window.localStorage.getItem(profilePhotoKey) || ''); }
+    catch { setProfilePhoto(''); }
+  }, [profilePhotoKey]);
+  useEffect(() => {
+    if (!profileMenuOpen) return undefined;
+    function closeOnOutsideClick(event) {
+      if (!profileMenuRef.current?.contains(event.target)) setProfileMenuOpen(false);
+    }
+    function closeOnEscape(event) {
+      if (event.key === 'Escape') setProfileMenuOpen(false);
+    }
+    document.addEventListener('pointerdown', closeOnOutsideClick);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsideClick);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [profileMenuOpen]);
   const reserve = persona === 'Kid' ? 100 : persona === 'Teen' ? 750 : 1200;
   useEffect(() => { copilotEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }); }, [copilotMessages, aiLoading]);
   const cashFloor = persona === 'Kid' ? 0 : persona === 'Teen' ? 100 : 300;
@@ -430,6 +455,32 @@ function App() {
     setLinkedInstitution('');
     setAccountProfile(null);
     setActivePage('Overview');
+    setProfileMenuOpen(false);
+  }
+
+  function changeProfilePhoto(event) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { setProfilePhotoMessage('Choose an image file.'); return; }
+    if (file.size > 2 * 1024 * 1024) { setProfilePhotoMessage('Choose a photo smaller than 2 MB.'); return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const photo = String(reader.result || '');
+      try {
+        window.localStorage.setItem(profilePhotoKey, photo);
+        setProfilePhoto(photo);
+        setProfilePhotoMessage('Profile photo updated.');
+      } catch { setProfilePhotoMessage('This photo could not be saved in this browser. Try a smaller image.'); }
+    };
+    reader.onerror = () => setProfilePhotoMessage('This photo could not be opened. Try another image.');
+    reader.readAsDataURL(file);
+  }
+
+  function removeProfilePhoto() {
+    try { window.localStorage.removeItem(profilePhotoKey); } catch { /* The initials avatar remains available. */ }
+    setProfilePhoto('');
+    setProfilePhotoMessage('Photo removed.');
   }
 
   async function plaidRequest(payload) {
@@ -555,11 +606,11 @@ function App() {
       <div className="sidebar-section-label">WORKSPACE</div>
       <nav className="sidebar-nav" aria-label="Main navigation">{accountPages.map(({ label, page, icon: Icon }) => <button key={page} className={activePage === page ? 'sidebar-link active' : 'sidebar-link'} onClick={() => setActivePage(page)} aria-current={activePage === page ? 'page' : undefined}><Icon size={18}/><span>{persona === 'Kid' && label === 'Portfolio' ? 'My stocks' : label}</span></button>)}</nav>
       {persona === 'Kid' && <div className="kid-glossary"><b>Money words</b><p><strong>Stock</strong> · a tiny piece of a company.</p><p><strong>Price</strong> · what one piece costs right now.</p><p><strong>Paper money</strong> · pretend dollars for practice.</p><p><strong>Risk</strong> · the chance your pretend money goes down.</p></div>}
-      <div className="sidebar-bottom"><button className="theme-toggle" onClick={toggleColorMode}><span className="theme-toggle-icon">{darkMode ? <Sun size={16}/> : <Moon size={16}/>}</span>{darkMode ? 'Light mode' : 'Dark mode'}</button><div className="sidebar-profile"><span className="locked-account-avatar">{(accountProfile?.firstName || persona).slice(0, 1).toUpperCase()}</span><span><b>{accountProfile?.firstName || `${persona} account`}</b><small>{persona} account</small></span></div></div>
+      <div className="sidebar-bottom"><button className="theme-toggle" onClick={toggleColorMode}><span className="theme-toggle-icon">{darkMode ? <Sun size={16}/> : <Moon size={16}/>}</span>{darkMode ? 'Light mode' : 'Dark mode'}</button><div className="sidebar-profile"><span className="locked-account-avatar">{profilePhoto ? <img src={profilePhoto} alt=""/> : (accountProfile?.firstName || persona).slice(0, 1).toUpperCase()}</span><span><b>{accountProfile?.firstName || `${persona} account`}</b><small>{persona} account</small></span></div></div>
     </aside>
     <div className="workspace">
     <header className="topbar">
-      <div className="top-actions">{activePage !== 'Wealth' && persona !== 'Kid' && (accountProfile || savedAccount) && <button className="session-button" onClick={accountProfile ? logOut : logIn}>{accountProfile ? 'Log out' : 'Log in'}</button>}<button className="new-account-button" onClick={createNewAccount}>New account</button><button className="icon-btn" aria-label="Notifications"><Bell size={18}/></button><button className="avatar" aria-label="Account profile">{(accountProfile?.firstName || persona).slice(0, 1).toUpperCase()}</button></div>
+      <div className="top-actions"><button className="new-account-button" onClick={createNewAccount}>New account</button><button className="icon-btn" aria-label="Notifications"><Bell size={18}/></button><div className="profile-menu-wrap" ref={profileMenuRef}><button type="button" className="avatar" aria-label="Open profile settings" aria-haspopup="dialog" aria-expanded={profileMenuOpen} onClick={() => { setProfilePhotoMessage(''); setProfileMenuOpen(open => !open); }}>{profilePhoto ? <img src={profilePhoto} alt=""/> : (accountProfile?.firstName || persona).slice(0, 1).toUpperCase()}</button>{profileMenuOpen && <section className="profile-menu" role="dialog" aria-label="Profile settings"><div className="profile-menu-heading"><span className="profile-menu-photo">{profilePhoto ? <img src={profilePhoto} alt=""/> : (accountProfile?.firstName || persona).slice(0, 1).toUpperCase()}</span><span><b>{accountProfile?.firstName || `${persona} account`}</b><small>{persona} account · this browser</small></span></div><input ref={profilePhotoInputRef} className="profile-photo-input" type="file" accept="image/*" onChange={changeProfilePhoto} aria-label="Choose a profile photo"/><button type="button" className="profile-menu-action" onClick={() => profilePhotoInputRef.current?.click()}><Camera size={16}/><span>Change profile photo</span></button>{profilePhoto && <button type="button" className="profile-menu-action profile-photo-remove" onClick={removeProfilePhoto}>Remove photo</button>}{profilePhotoMessage && <small className="profile-photo-message" role="status">{profilePhotoMessage}</small>}<div className="profile-menu-divider"/><button type="button" className="profile-menu-theme" role="switch" aria-checked={darkMode} onClick={toggleColorMode}><span className="profile-menu-theme-icon">{darkMode ? <Moon size={17}/> : <Sun size={17}/>}</span><span className="profile-menu-theme-copy"><b>Dark mode</b><small>{darkMode ? 'On · easier on the eyes' : 'Off · light appearance'}</small></span><span className={`profile-mode-switch ${darkMode ? 'on' : ''}`}><i/></span></button><div className="profile-menu-divider"/><button type="button" className="profile-menu-logout" onClick={logOut}><LogOut size={16}/><span>Log out</span></button></section>}</div></div>
     </header>
     <main id="top" className="dashboard">
       {['Overview','Portfolio','Tools','Learn'].includes(activePage) && <div className="page-title-row"><div><div className="eyebrow">{activePageLabel.toUpperCase()}</div><h1>{activePage === 'Overview' ? (accountProfile?.firstName ? `Welcome, ${accountProfile.firstName}` : displayName) : activePageLabel}</h1><p>{activePage === 'Overview' ? personaCopy : activePage === 'Portfolio' ? (persona === 'Adult' ? 'Account cash, investments, and recent activity.' : 'Your practice cash, stocks, and recent decisions.') : activePage === 'Learn' ? 'Short, friendly lessons about money, stocks, and chart patterns.' : persona === 'Adult' ? 'Review your financial planning tools.' : 'Explore guarded tools for your practice account.'}</p></div><span className="page-persona-tag">{linkedAccount ? 'Plaid Sandbox' : persona === 'Adult' ? 'Personal account' : 'Demo account'} · {persona}</span></div>}
