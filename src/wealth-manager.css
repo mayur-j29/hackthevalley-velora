@@ -165,3 +165,9 @@
   .wm-linked-account-metrics article{padding:12px}
   .wm-linked-account-metrics article>b{font-size:18px}
 }
+
+/* Win against the shared app theme's card surface override */
+.professional-theme .wealth-manager .wm-account-label{background-color:#1b2b23!important;border-color:#35523d!important;color:#edf3ed!important}
+.professional-theme .wealth-manager .wm-account-label>span{color:#a8c3b1!important}
+.professional-theme .wealth-manager .wm-account-label>b{color:#edf3ed!important}
+.professional-theme .wealth-manager .wm-account-label>small{color:#b6c5ba!important}
