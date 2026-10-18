@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Activity, ArrowDownLeft, ArrowUpRight, Bell, BookOpenCheck, CalendarDays, Check, ChevronDown, CircleDollarSign, CircleHelp, Clock3, CreditCard, Landmark, ShieldCheck, Sparkles, TrendingDown, TrendingUp, Wallet, Wrench, X, LayoutDashboard, BriefcaseBusiness, Sun, Moon } from 'lucide-react';
+import { Activity, ArrowDownLeft, ArrowUpRight, Bell, BookOpenCheck, CalendarDays, Check, ChevronDown, CircleDollarSign, CircleHelp, Clock3, CreditCard, Landmark, LockKeyhole, ShieldCheck, Sparkles, TrendingDown, TrendingUp, Wallet, Wrench, X, LayoutDashboard, BriefcaseBusiness, Sun, Moon } from 'lucide-react';
 import { buildForecast, crashScenarios, evaluateSimulatedTrade, getSafeSurplus, simulateAutoInvest } from './finance';
 import MarketReplay from './MarketReplay';
 import PaperPortfolio from './PaperPortfolio';
