@@ -1,3 +1,4 @@
+Made by Mayur Joshi and Rugved Shinde (owner of repo)
 # Velora
 
 Velora’s primary **Wealth Manager** workspace runs a seeded market simulation with three dummy portfolios. Its prices are generated in the browser; no broker or market-data API is used by this workspace. When Supabase is configured, users sign in, enter a short profile, and save simulation state in a private per-user database row. Without Supabase, it stays in clearly labeled local mode. Gemini is optional and runs only from server-side Vercel functions; without a key or when AI is unavailable, Velora uses deterministic persona-based rules.
